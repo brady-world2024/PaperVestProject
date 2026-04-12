@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "PaperVest",
+    "slug": "papervest",
+    "version": "1.0.0",
+    "icon": "./assets/papervest-logo.png",
+    "orientation": "portrait",
+    "scheme": "papervest",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/papervest-logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#18222B"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/papervest-logo.png",
+        "backgroundColor": "#18222B"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}

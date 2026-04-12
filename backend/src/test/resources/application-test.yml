@@ -1,0 +1,55 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:papervest;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=false
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+  flyway:
+    enabled: false
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+    listener:
+      simple:
+        auto-startup: false
+
+app:
+  security:
+    jwt-secret: test-secret-key-that-is-long-enough-12345
+    access-token-ttl: PT15M
+    refresh-token-ttl: P30D
+    allowed-origins:
+      - http://localhost:3000
+      - http://localhost:8081
+  portfolio:
+    initial-cash: 100000.00
+  market-data:
+    provider: FINNHUB
+    request-timeout: PT4S
+    quote-cache-ttl: PT30S
+    history-cache-ttl: PT5M
+    search-cache-ttl: PT5M
+    home-symbols:
+      - symbol: AAPL
+        company-name: Apple
+    finnhub:
+      base-url: https://finnhub.io/api/v1
+      api-key: test-key
+  conditional-orders:
+    scheduler:
+      enabled: false
+      batch-size: 25
+      fixed-delay-ms: 60000
+    messaging:
+      exchange: conditional-orders.exchange
+      queue: conditional-orders.execute
+      routing-key: conditional-orders.execute
+      listener-enabled: false

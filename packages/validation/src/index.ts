@@ -1,0 +1,72 @@
+import { z } from 'zod';
+
+export const emailSchema = z.string().email('Enter a valid email address');
+
+export const passwordSchema = z
+  .string()
+  .min(8, 'Password must be at least 8 characters long')
+  .regex(/[A-Z]/, 'Add at least one uppercase letter')
+  .regex(/[a-z]/, 'Add at least one lowercase letter')
+  .regex(/[0-9]/, 'Add at least one number');
+
+export const loginFormSchema = z.object({
+  email: emailSchema,
+  password: z.string().min(8, 'Password must be at least 8 characters long'),
+});
+
+export const registerFormSchema = z
+  .object({
+    email: emailSchema,
+    password: passwordSchema,
+    confirmPassword: z.string().min(1, 'Confirm your password'),
+  })
+  .refine((values) => values.password === values.confirmPassword, {
+    path: ['confirmPassword'],
+    message: 'Passwords must match',
+  });
+
+export const tradeFormSchema = z.object({
+  quantity: z
+    .string()
+    .min(1, 'Enter the quantity to trade')
+    .refine((value) => !Number.isNaN(Number(value)), 'Enter a valid number')
+    .refine((value) => Number(value) > 0, 'Quantity must be greater than zero'),
+});
+
+export const stockSearchSchema = z
+  .string()
+  .trim()
+  .min(1, 'Enter a ticker or company name')
+  .max(32, 'Search must be 32 characters or fewer');
+
+export const conditionalOrderFormSchema = z.object({
+  symbol: z
+    .string()
+    .trim()
+    .min(1, 'Enter a stock symbol')
+    .max(16, 'Symbol must be 16 characters or fewer'),
+  side: z.enum(['BUY', 'SELL']),
+  targetPrice: z
+    .string()
+    .min(1, 'Enter a target price')
+    .refine((value) => !Number.isNaN(Number(value)), 'Enter a valid price')
+    .refine((value) => Number(value) > 0, 'Target price must be greater than zero'),
+  quantity: z
+    .string()
+    .min(1, 'Enter the quantity to trade')
+    .refine((value) => !Number.isNaN(Number(value)), 'Enter a valid quantity')
+    .refine((value) => Number(value) > 0, 'Quantity must be greater than zero'),
+});
+
+export type LoginFormValues = z.infer<typeof loginFormSchema>;
+export type RegisterFormValues = z.infer<typeof registerFormSchema>;
+export type TradeFormValues = z.infer<typeof tradeFormSchema>;
+export type ConditionalOrderFormValues = z.infer<typeof conditionalOrderFormSchema>;
+
+export function normalizeTradeQuantity(quantity: string) {
+  return Number(quantity);
+}
+
+export function normalizeConditionalOrderNumber(value: string) {
+  return Number(value);
+}

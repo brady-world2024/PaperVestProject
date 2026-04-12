@@ -1,0 +1,18 @@
+{
+  "name": "papervest",
+  "private": true,
+  "packageManager": "pnpm@9.15.2",
+  "scripts": {
+    "dev": "turbo run dev --parallel --filter=@papervest/web --filter=@papervest/mobile",
+    "dev:web": "pnpm --filter @papervest/web dev",
+    "dev:mobile": "pnpm --filter @papervest/mobile start",
+    "dev:backend": "cd backend && ./mvnw spring-boot:run",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "lint": "turbo run lint"
+  },
+  "devDependencies": {
+    "turbo": "^2.1.3"
+  }
+}

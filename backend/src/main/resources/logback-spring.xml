@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+	<include resource="org/springframework/boot/logging/logback/defaults.xml" />
+
+	<springProperty scope="context" name="applicationName" source="spring.application.name" defaultValue="PaperVest API" />
+
+	<property
+		name="PLAIN_CONSOLE_PATTERN"
+		value="%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%thread] %logger{36} [requestId=%X{requestId:-na} userId=%X{userId:-anonymous}] - %msg%n%wEx" />
+
+	<springProfile name="json-logs">
+		<appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+			<encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+				<pattern><![CDATA[{"timestamp":"%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX}","level":"%level","application":"${applicationName}","thread":"%thread","logger":"%logger{36}","requestId":"%X{requestId:-}","userId":"%X{userId:-}","httpMethod":"%X{httpMethod:-}","path":"%X{requestPath:-}","message":"%replace(%msg){'"','\\"'}"}%n%wEx]]></pattern>
+			</encoder>
+		</appender>
+
+		<root level="${LOGGING_LEVEL_ROOT:-INFO}">
+			<appender-ref ref="CONSOLE" />
+		</root>
+	</springProfile>
+
+	<springProfile name="!json-logs">
+		<appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+			<encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+				<pattern>${PLAIN_CONSOLE_PATTERN}</pattern>
+			</encoder>
+		</appender>
+
+		<root level="${LOGGING_LEVEL_ROOT:-INFO}">
+			<appender-ref ref="CONSOLE" />
+		</root>
+	</springProfile>
+</configuration>
