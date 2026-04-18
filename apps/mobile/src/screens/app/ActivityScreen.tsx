@@ -9,7 +9,12 @@ import { SectionHeader } from '../../components/layout/SectionHeader';
 import { getTradeHistory } from '../../services/api/papervestApi';
 import { queryKeys } from '../../services/api/queryKeys';
 import { appTheme } from '../../theme';
-import { formatCurrency, formatDateTime, formatShares } from '../../utils/formatters';
+import {
+  formatCurrency,
+  formatDateTime,
+  formatShares,
+  formatSignedCurrency,
+} from '../../utils/formatters';
 
 export function ActivityScreen() {
   const historyQuery = useQuery({
@@ -44,34 +49,44 @@ export function ActivityScreen() {
           <AppCard key={trade.tradeId}>
             <View style={styles.rowTop}>
               <View style={styles.flex}>
-                <Text style={styles.symbol}>{trade.symbol}</Text>
+                <View style={styles.symbolRow}>
+                  <Text style={styles.symbol}>{trade.symbol}</Text>
+                  <View
+                    style={[
+                      styles.sidePill,
+                      trade.side === 'BUY' ? styles.buyPill : styles.sellPill,
+                    ]}
+                  >
+                    <Text style={styles.sideText}>{trade.side}</Text>
+                  </View>
+                </View>
                 <Text style={styles.company}>{trade.companyName}</Text>
+                <Text style={styles.metaLine}>
+                  {formatShares(trade.quantity)} · {formatDateTime(trade.executedAt)}
+                </Text>
               </View>
-              <View
-                style={[
-                  styles.sidePill,
-                  trade.side === 'BUY' ? styles.buyPill : styles.sellPill,
-                ]}
-              >
-                <Text style={styles.sideText}>{trade.side}</Text>
+              <View style={styles.valueColumn}>
+                <Text style={styles.value}>{formatCurrency(trade.executedPrice)}</Text>
+                <Text
+                  style={[
+                    styles.change,
+                    trade.realizedPnl >= 0 ? styles.positive : styles.negative,
+                  ]}
+                >
+                  {formatSignedCurrency(trade.realizedPnl)}
+                </Text>
               </View>
             </View>
 
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Quantity</Text>
-              <Text style={styles.infoValue}>{formatShares(trade.quantity)}</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Executed price</Text>
-              <Text style={styles.infoValue}>{formatCurrency(trade.executedPrice)}</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Gross amount</Text>
-              <Text style={styles.infoValue}>{formatCurrency(trade.grossAmount)}</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Time</Text>
-              <Text style={styles.infoValue}>{formatDateTime(trade.executedAt)}</Text>
+            <View style={styles.detailGrid}>
+              <View style={styles.detailCard}>
+                <Text style={styles.detailLabel}>Gross amount</Text>
+                <Text style={styles.detailValue}>{formatCurrency(trade.grossAmount)}</Text>
+              </View>
+              <View style={styles.detailCard}>
+                <Text style={styles.detailLabel}>Cash after trade</Text>
+                <Text style={styles.detailValue}>{formatCurrency(trade.cashBalanceAfterTrade)}</Text>
+              </View>
             </View>
           </AppCard>
         ))
@@ -99,6 +114,12 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 4,
   },
+  symbolRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: appTheme.spacing.sm,
+    flexWrap: 'wrap',
+  },
   symbol: {
     color: appTheme.colors.textPrimary,
     fontSize: appTheme.typography.heading,
@@ -124,18 +145,52 @@ const styles = StyleSheet.create({
     fontSize: appTheme.typography.caption,
     fontWeight: '800',
   },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: appTheme.spacing.xs,
-  },
-  infoLabel: {
+  metaLine: {
     color: appTheme.colors.textSecondary,
-    fontSize: appTheme.typography.body,
+    fontSize: appTheme.typography.micro,
   },
-  infoValue: {
+  valueColumn: {
+    alignItems: 'flex-end',
+    gap: 4,
+    flexShrink: 1,
+  },
+  value: {
+    color: appTheme.colors.textPrimary,
+    fontSize: appTheme.typography.heading,
+    fontWeight: '700',
+    textAlign: 'right',
+  },
+  change: {
+    fontSize: appTheme.typography.caption,
+    fontWeight: '700',
+    textAlign: 'right',
+  },
+  positive: {
+    color: appTheme.colors.positive,
+  },
+  negative: {
+    color: appTheme.colors.negative,
+  },
+  detailGrid: {
+    flexDirection: 'row',
+    gap: appTheme.spacing.sm,
+    marginTop: appTheme.spacing.md,
+  },
+  detailCard: {
+    flex: 1,
+    backgroundColor: '#F9F6EE',
+    borderRadius: appTheme.radius.md,
+    paddingHorizontal: appTheme.spacing.md,
+    paddingVertical: appTheme.spacing.sm,
+    gap: 4,
+  },
+  detailLabel: {
+    color: appTheme.colors.textSecondary,
+    fontSize: appTheme.typography.micro,
+  },
+  detailValue: {
     color: appTheme.colors.textPrimary,
     fontSize: appTheme.typography.body,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 });

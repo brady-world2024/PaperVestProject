@@ -45,5 +45,7 @@ skills/
 **/SKILL.md
 *.doc
 *.docx
+*.md
+*.pdf
 
 *.log

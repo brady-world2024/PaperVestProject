@@ -1,3 +1,43 @@
+export type MarketSessionState = 'OPEN' | 'CLOSED' | 'PRE_MARKET' | 'AFTER_HOURS';
+
+export type MarketSessionPresentation = {
+  statusLabel: string;
+  priceLabel: string;
+  changeLabel: string;
+};
+
+export function getMarketSessionPresentation(
+  session: MarketSessionState
+): MarketSessionPresentation {
+  switch (session) {
+    case 'OPEN':
+      return {
+        statusLabel: 'Open',
+        priceLabel: 'Real-time price',
+        changeLabel: 'vs previous close',
+      };
+    case 'PRE_MARKET':
+      return {
+        statusLabel: 'Pre-Market',
+        priceLabel: 'Pre-market price',
+        changeLabel: 'Pre-market change',
+      };
+    case 'AFTER_HOURS':
+      return {
+        statusLabel: 'After Hours',
+        priceLabel: 'After-hours price',
+        changeLabel: 'After-hours change',
+      };
+    case 'CLOSED':
+    default:
+      return {
+        statusLabel: 'Closed',
+        priceLabel: 'Last price · Market closed',
+        changeLabel: 'vs previous close',
+      };
+  }
+}
+
 export type ApiFieldError = {
   field: string;
   message: string;
@@ -64,6 +104,9 @@ export type Quote = {
   previousClose: number;
   quoteTimestamp: string;
   stale: boolean;
+  marketSession: MarketSessionState;
+  tradingEnabled: boolean;
+  marketTimezone: string;
 };
 
 export type HomeMarketResponse = {
@@ -106,7 +149,11 @@ export type WatchlistItem = {
   currentPrice: number | null;
   dailyChange: number | null;
   dailyChangePercent: number | null;
+  quoteTimestamp: string | null;
   staleQuote: boolean;
+  marketSession: MarketSessionState | null;
+  tradingEnabled: boolean;
+  marketTimezone: string | null;
   addedAt: string;
 };
 
@@ -126,6 +173,10 @@ export type Holding = {
   unrealizedPnlPercent: number;
   dailyChange: number;
   staleQuote: boolean;
+  quoteTimestamp: string | null;
+  marketSession: MarketSessionState | null;
+  tradingEnabled: boolean;
+  marketTimezone: string | null;
 };
 
 export type PortfolioSummary = {
@@ -191,6 +242,7 @@ export type ConditionalOrderFailureCode =
   | 'ORDER_CANCELLED'
   | 'ORDER_EXPIRED'
   | 'PRICE_CONDITION_NOT_MET_ANYMORE'
+  | 'MARKET_CLOSED'
   | 'INTERNAL_ERROR';
 
 export type CreateConditionalOrderPayload = {

@@ -29,6 +29,7 @@ type Props = {
   pending: boolean;
   errorMessage?: string | null;
   successMessage?: string | null;
+  externalBlockingMessage?: string | null;
   getBlockingMessage?: (quantity: number) => string | null;
   onSubmitQuantity: (quantity: number) => Promise<void>;
 };
@@ -47,6 +48,7 @@ export function TradeOrderCard({
   pending,
   errorMessage,
   successMessage,
+  externalBlockingMessage,
   getBlockingMessage,
   onSubmitQuantity,
 }: Props) {
@@ -65,7 +67,7 @@ export function TradeOrderCard({
 
   const quantity = normalizeTradeQuantity(watch('quantity') || '0');
   const estimatedValue = quantity * currentPrice;
-  const blockingMessage = getBlockingMessage?.(quantity) ?? null;
+  const blockingMessage = externalBlockingMessage ?? getBlockingMessage?.(quantity) ?? null;
 
   return (
     <AppCard>
@@ -74,7 +76,8 @@ export function TradeOrderCard({
         className="pv-stack"
         onSubmit={handleSubmit(async ({ quantity: rawQuantity }) => {
           const normalizedQuantity = normalizeTradeQuantity(rawQuantity);
-          const nextBlockingMessage = getBlockingMessage?.(normalizedQuantity) ?? null;
+          const nextBlockingMessage =
+            externalBlockingMessage ?? getBlockingMessage?.(normalizedQuantity) ?? null;
           if (nextBlockingMessage) {
             return;
           }

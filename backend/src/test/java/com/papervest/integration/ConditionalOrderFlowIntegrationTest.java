@@ -11,6 +11,7 @@ import com.papervest.conditionalorder.model.ConditionalOrderStatusEvent;
 import com.papervest.conditionalorder.repository.ConditionalOrderRepository;
 import com.papervest.conditionalorder.repository.ConditionalOrderStatusEventRepository;
 import com.papervest.conditionalorder.service.ConditionalOrderExecutionService;
+import com.papervest.marketdata.model.MarketSessionState;
 import com.papervest.marketdata.model.StockQuote;
 import com.papervest.marketdata.service.MarketDataService;
 import com.papervest.portfolio.model.UserAccount;
@@ -202,6 +203,22 @@ class ConditionalOrderFlowIntegrationTest {
 	}
 
 	@Test
+	void orderStaysActiveWhenMarketIsClosed() throws Exception {
+		AuthSession session = registerUser();
+		ConditionalOrder order = createOrder(session.accessToken(), "BUY", "100.00", "2.0");
+
+		when(marketDataService.getQuote("AAPL", null)).thenReturn(stockQuote("95.0000", MarketSessionState.AFTER_HOURS));
+
+		conditionalOrderExecutionService.scanAndTriggerReadyOrders();
+
+		ConditionalOrder reloaded = conditionalOrderRepository.findById(order.getId()).orElseThrow();
+		assertThat(reloaded.getStatus()).isEqualTo(ConditionalOrderStatus.ACTIVE);
+		assertThat(reloaded.getLastCheckedPrice()).isEqualByComparingTo("95.0000");
+		verify(messagePublisher, never()).publish(any(UUID.class));
+		assertThat(eventRepository.findByConditionalOrderIdOrderByCreatedAtAsc(order.getId())).hasSize(1);
+	}
+
+	@Test
 	void repeatedExecutionMessageDoesNotCreateDuplicateTrade() throws Exception {
 		AuthSession session = registerUser();
 		ConditionalOrder order = createOrder(session.accessToken(), "BUY", "100.00", "5.0");
@@ -299,6 +316,27 @@ class ConditionalOrderFlowIntegrationTest {
 	}
 
 	@Test
+	void marketClosedDuringExecutionReturnsOrderToActive() throws Exception {
+		AuthSession session = registerUser();
+		ConditionalOrder order = createOrder(session.accessToken(), "BUY", "100.00", "1.0");
+
+		when(marketDataService.getQuote("AAPL", null))
+				.thenReturn(stockQuote("95.0000"))
+				.thenReturn(stockQuote("95.0000", MarketSessionState.AFTER_HOURS));
+
+		conditionalOrderExecutionService.scanAndTriggerReadyOrders();
+		conditionalOrderExecutionService.handleTriggeredOrder(order.getId());
+
+		ConditionalOrder reloaded = conditionalOrderRepository.findById(order.getId()).orElseThrow();
+		assertThat(reloaded.getStatus()).isEqualTo(ConditionalOrderStatus.ACTIVE);
+		assertThat(reloaded.getFailureCode()).isNull();
+		assertThat(tradeRepository.findByExecutionKey(order.getExecutionKey())).isEmpty();
+		assertThat(eventRepository.findByConditionalOrderIdOrderByCreatedAtAsc(order.getId()))
+				.extracting(ConditionalOrderStatusEvent::getReasonCode)
+				.contains("MARKET_CLOSED");
+	}
+
+	@Test
 	void executionKeyUniqueConstraintIsEnforcedOnTrades() throws Exception {
 		AuthSession session = registerUser();
 
@@ -384,6 +422,10 @@ class ConditionalOrderFlowIntegrationTest {
 	}
 
 	private StockQuote stockQuote(String price) {
+		return stockQuote(price, MarketSessionState.OPEN);
+	}
+
+	private StockQuote stockQuote(String price, MarketSessionState marketSession) {
 		return new StockQuote(
 				"AAPL",
 				"Apple Inc.",
@@ -394,8 +436,11 @@ class ConditionalOrderFlowIntegrationTest {
 				new BigDecimal("101.0000"),
 				new BigDecimal("98.0000"),
 				new BigDecimal("98.5000"),
-				Instant.parse("2026-01-01T10:00:00Z"),
-				false
+				Instant.parse("2026-01-02T15:00:00Z"),
+				false,
+				marketSession,
+				marketSession == MarketSessionState.OPEN,
+				"America/New_York"
 		);
 	}
 

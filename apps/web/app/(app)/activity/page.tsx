@@ -59,39 +59,41 @@ export default function ActivityPage() {
               <AppCard key={trade.tradeId}>
                 <div className="pv-list-row-head">
                   <div className="pv-list-primary">
-                    <span className="pv-list-symbol">{trade.symbol}</span>
+                    <span className="pv-list-symbol-line">
+                      <span className="pv-list-symbol">{trade.symbol}</span>
+                      <span className={`pv-chip ${trade.side === 'BUY' ? 'buy' : 'sell'}`}>
+                        {trade.side}
+                      </span>
+                    </span>
                     <span className="pv-list-company">{trade.companyName}</span>
+                    <span className="pv-list-meta-line">
+                      <span>{formatShares(trade.quantity)}</span>
+                      <span>{formatDateTime(trade.executedAt)}</span>
+                    </span>
                   </div>
-                  <span className={`pv-chip ${trade.side === 'BUY' ? 'buy' : 'sell'}`}>
-                    {trade.side}
-                  </span>
+                  <div className="pv-list-secondary">
+                    <strong>{formatCurrency(trade.executedPrice)}</strong>
+                    <span className={trade.realizedPnl >= 0 ? 'pv-positive' : 'pv-negative'}>
+                      {formatSignedCurrency(trade.realizedPnl)}
+                    </span>
+                  </div>
                 </div>
 
-                <div className="pv-meta-row">
-                  <span className="pv-kicker">Quantity</span>
-                  <strong>{formatShares(trade.quantity)}</strong>
-                </div>
-                <div className="pv-meta-row">
-                  <span className="pv-kicker">Executed price</span>
-                  <strong>{formatCurrency(trade.executedPrice)}</strong>
-                </div>
-                <div className="pv-meta-row">
-                  <span className="pv-kicker">Gross amount</span>
-                  <strong>{formatCurrency(trade.grossAmount)}</strong>
-                </div>
-                <div className="pv-meta-row">
-                  <span className="pv-kicker">Realized P&amp;L</span>
-                  <strong className={trade.realizedPnl >= 0 ? 'pv-positive' : 'pv-negative'}>
-                    {formatSignedCurrency(trade.realizedPnl)}
-                  </strong>
-                </div>
-                <div className="pv-meta-row">
-                  <span className="pv-kicker">Cash after trade</span>
-                  <strong>{formatCurrency(trade.cashBalanceAfterTrade)}</strong>
-                </div>
-                <div className="pv-meta-row">
-                  <span className="pv-kicker">Executed at</span>
-                  <strong>{formatDateTime(trade.executedAt)}</strong>
+                <div className="pv-activity-detail-grid">
+                  <div className="pv-activity-detail-cell">
+                    <span className="pv-kicker">Gross amount</span>
+                    <strong>{formatCurrency(trade.grossAmount)}</strong>
+                  </div>
+                  <div className="pv-activity-detail-cell">
+                    <span className="pv-kicker">Cash after trade</span>
+                    <strong>{formatCurrency(trade.cashBalanceAfterTrade)}</strong>
+                  </div>
+                  <div className="pv-activity-detail-cell">
+                    <span className="pv-kicker">Realized P&amp;L</span>
+                    <strong className={trade.realizedPnl >= 0 ? 'pv-positive' : 'pv-negative'}>
+                      {formatSignedCurrency(trade.realizedPnl)}
+                    </strong>
+                  </div>
                 </div>
               </AppCard>
             ))}

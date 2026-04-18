@@ -1,6 +1,9 @@
 package com.papervest.portfolio.dto;
 
+import com.papervest.marketdata.model.MarketSessionState;
+
 import java.math.BigDecimal;
+import java.time.Instant;
 
 public record HoldingResponse(
 		String symbol,
@@ -13,6 +16,10 @@ public record HoldingResponse(
 		BigDecimal unrealizedPnl,
 		BigDecimal unrealizedPnlPercent,
 		BigDecimal dailyChange,
-		boolean staleQuote
+		boolean staleQuote,
+		Instant quoteTimestamp,
+		MarketSessionState marketSession,
+		boolean tradingEnabled,
+		String marketTimezone
 ) {
 }

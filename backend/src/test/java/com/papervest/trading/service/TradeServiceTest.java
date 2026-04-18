@@ -1,6 +1,7 @@
 package com.papervest.trading.service;
 
 import com.papervest.common.exception.InvalidTradeException;
+import com.papervest.marketdata.model.MarketSessionState;
 import com.papervest.marketdata.model.StockQuote;
 import com.papervest.marketdata.service.MarketDataService;
 import com.papervest.portfolio.model.UserAccount;
@@ -30,6 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -59,7 +61,7 @@ class TradeServiceTest {
 
 	@BeforeEach
 	void setUp() {
-		when(transactionManager.getTransaction(any(TransactionDefinition.class))).thenReturn(transactionStatus);
+		lenient().when(transactionManager.getTransaction(any(TransactionDefinition.class))).thenReturn(transactionStatus);
 		tradeService = new TradeService(
 				userAccountRepository,
 				holdingRepository,
@@ -111,7 +113,27 @@ class TradeServiceTest {
 		verify(tradeRepository, never()).save(any(Trade.class));
 	}
 
+	@Test
+	void buyRejectsWhenRegularMarketIsClosed() {
+		UUID userId = UUID.randomUUID();
+		TradeOrderRequest request = new TradeOrderRequest("AAPL", "Apple Inc.", new BigDecimal("1"));
+
+		when(marketDataService.getQuote("AAPL", "Apple Inc."))
+				.thenReturn(stockQuote(new BigDecimal("100.0000"), MarketSessionState.AFTER_HOURS));
+
+		assertThatThrownBy(() -> tradeService.buy(userId, request, null))
+				.isInstanceOf(InvalidTradeException.class)
+				.hasMessageContaining("regular market hours");
+
+		verify(userAccountRepository, never()).findByUserIdForUpdate(userId);
+		verify(tradeRepository, never()).save(any(Trade.class));
+	}
+
 	private StockQuote stockQuote(BigDecimal price) {
+		return stockQuote(price, MarketSessionState.OPEN);
+	}
+
+	private StockQuote stockQuote(BigDecimal price, MarketSessionState marketSession) {
 		return new StockQuote(
 				"AAPL",
 				"Apple Inc.",
@@ -122,8 +144,11 @@ class TradeServiceTest {
 				new BigDecimal("101.0000"),
 				new BigDecimal("98.0000"),
 				new BigDecimal("98.5000"),
-				Instant.parse("2026-01-01T10:00:00Z"),
-				false
+				Instant.parse("2026-01-02T15:00:00Z"),
+				false,
+				marketSession,
+				marketSession == MarketSessionState.OPEN,
+				"America/New_York"
 		);
 	}
 }

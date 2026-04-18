@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useDeferredValue, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { getMarketSessionPresentation } from '@papervest/shared-types';
 
 import { AppButtonLink } from '@/components/app-button';
 import { AppCard } from '@/components/app-card';
@@ -18,10 +19,12 @@ import { webApi } from '@/lib/api';
 import {
   formatCurrency,
   formatDateTime,
+  formatMarketTimestamp,
   formatPercent,
   formatShares,
   formatSignedCurrency,
 } from '@/lib/formatters';
+import { getMarketSessionChipClass } from '@/lib/market-session';
 
 export default function DashboardPage() {
   const [searchText, setSearchText] = useState('');
@@ -195,26 +198,44 @@ export default function DashboardPage() {
           ) : watchlistItems.length ? (
             <div className="pv-list">
               {watchlistItems.slice(0, 4).map((item) => (
-                <Link
-                  key={item.symbol}
-                  className="pv-list-row"
-                  href={`/stocks/${item.symbol}?companyName=${encodeURIComponent(item.companyName)}`}
-                >
-                  <div className="pv-list-primary">
-                    <span className="pv-list-symbol">{item.symbol}</span>
-                    <span className="pv-list-company">{item.companyName}</span>
-                  </div>
-                  <div className="pv-list-secondary">
-                    <strong>{item.currentPrice == null ? '...' : formatCurrency(item.currentPrice)}</strong>
-                    {item.dailyChange != null && item.dailyChangePercent != null ? (
-                      <span className={item.dailyChange >= 0 ? 'pv-positive' : 'pv-negative'}>
-                        {formatSignedCurrency(item.dailyChange)} · {formatPercent(item.dailyChangePercent)}
-                      </span>
-                    ) : (
-                      <span className="pv-kicker">Quote unavailable</span>
-                    )}
-                  </div>
-                </Link>
+                (() => {
+                  const marketSession = getMarketSessionPresentation(item.marketSession ?? 'CLOSED');
+
+                  return (
+                    <Link
+                      key={item.symbol}
+                      className="pv-list-row"
+                      href={`/stocks/${item.symbol}?companyName=${encodeURIComponent(item.companyName)}`}
+                    >
+                      <div className="pv-list-primary">
+                        <span className="pv-list-symbol-line">
+                          <span className="pv-list-symbol">{item.symbol}</span>
+                          <span className={`pv-chip ${getMarketSessionChipClass(item.marketSession ?? 'CLOSED')}`}>
+                            {marketSession.statusLabel}
+                          </span>
+                        </span>
+                        <span className="pv-list-company">{item.companyName}</span>
+                        {item.quoteTimestamp ? (
+                          <span className="pv-list-meta-line">
+                            <span>{marketSession.priceLabel}</span>
+                            <span>{formatMarketTimestamp(item.quoteTimestamp, item.marketTimezone ?? undefined)}</span>
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="pv-list-secondary">
+                        <strong>{item.currentPrice == null ? '...' : formatCurrency(item.currentPrice)}</strong>
+                        {item.dailyChange != null && item.dailyChangePercent != null ? (
+                          <span className={item.dailyChange >= 0 ? 'pv-positive' : 'pv-negative'}>
+                            {formatSignedCurrency(item.dailyChange)} · {formatPercent(item.dailyChangePercent)}
+                          </span>
+                        ) : (
+                          <span className="pv-kicker">Quote unavailable</span>
+                        )}
+                        <span className="pv-kicker">{marketSession.changeLabel}</span>
+                      </div>
+                    </Link>
+                  );
+                })()
               ))}
             </div>
           ) : (
@@ -254,14 +275,17 @@ export default function DashboardPage() {
                   href={`/stocks/${trade.symbol}?companyName=${encodeURIComponent(trade.companyName)}`}
                 >
                   <div className="pv-list-primary">
-                    <span className="pv-list-symbol">
-                      {trade.symbol}{' '}
+                    <span className="pv-list-symbol-line">
+                      <span className="pv-list-symbol">{trade.symbol}</span>
                       <span className={`pv-chip ${trade.side === 'BUY' ? 'buy' : 'sell'}`}>
                         {trade.side}
                       </span>
                     </span>
                     <span className="pv-list-company">{trade.companyName}</span>
-                    <span className="pv-kicker">{formatDateTime(trade.executedAt)}</span>
+                    <span className="pv-list-meta-line">
+                      <span>{formatShares(trade.quantity)}</span>
+                      <span>{formatDateTime(trade.executedAt)}</span>
+                    </span>
                   </div>
                   <div className="pv-list-secondary">
                     <strong>{formatCurrency(trade.executedPrice)}</strong>
@@ -325,29 +349,47 @@ export default function DashboardPage() {
               </div>
             ) : holdings.length ? (
               <div className="pv-list">
-                {holdings.slice(0, 4).map((holding) => (
-                  <Link
-                    key={holding.symbol}
-                    className="pv-list-row"
-                    href={`/stocks/${holding.symbol}?companyName=${encodeURIComponent(holding.companyName)}`}
-                  >
-                    <div className="pv-list-primary">
-                      <span className="pv-list-symbol">{holding.symbol}</span>
-                      <span className="pv-list-company">{holding.companyName}</span>
-                      <span className="pv-kicker">
-                        {formatShares(holding.quantity)} shares · Avg {formatCurrency(holding.averageCost)}
-                      </span>
-                    </div>
-                    <div className="pv-list-secondary">
-                      <strong>{formatCurrency(holding.marketValue)}</strong>
-                      <span className={holding.unrealizedPnl >= 0 ? 'pv-positive' : 'pv-negative'}>
-                        {formatSignedCurrency(holding.unrealizedPnl)} · {formatPercent(holding.unrealizedPnlPercent)}
-                      </span>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            ) : (
+              {holdings.slice(0, 4).map((holding) => (
+                (() => {
+                  const marketSession = getMarketSessionPresentation(holding.marketSession ?? 'CLOSED');
+
+                  return (
+                    <Link
+                      key={holding.symbol}
+                      className="pv-list-row"
+                      href={`/stocks/${holding.symbol}?companyName=${encodeURIComponent(holding.companyName)}`}
+                    >
+                      <div className="pv-list-primary">
+                        <span className="pv-list-symbol-line">
+                          <span className="pv-list-symbol">{holding.symbol}</span>
+                          <span className={`pv-chip ${getMarketSessionChipClass(holding.marketSession ?? 'CLOSED')}`}>
+                            {marketSession.statusLabel}
+                          </span>
+                        </span>
+                        <span className="pv-list-company">{holding.companyName}</span>
+                        <span className="pv-list-meta-line">
+                          <span>{formatShares(holding.quantity)} shares</span>
+                          <span>Avg {formatCurrency(holding.averageCost)}</span>
+                        </span>
+                        {holding.quoteTimestamp ? (
+                          <span className="pv-list-meta-line">
+                            <span>{marketSession.priceLabel}</span>
+                            <span>{formatMarketTimestamp(holding.quoteTimestamp, holding.marketTimezone ?? undefined)}</span>
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="pv-list-secondary">
+                        <strong>{formatCurrency(holding.marketValue)}</strong>
+                        <span className={holding.unrealizedPnl >= 0 ? 'pv-positive' : 'pv-negative'}>
+                          {formatSignedCurrency(holding.unrealizedPnl)} · {formatPercent(holding.unrealizedPnlPercent)}
+                        </span>
+                      </div>
+                    </Link>
+                  );
+                })()
+              ))}
+            </div>
+          ) : (
               <EmptyState
                 title="No holdings yet"
                 description="Place a simulated buy order from any stock detail page and positions will show up here."

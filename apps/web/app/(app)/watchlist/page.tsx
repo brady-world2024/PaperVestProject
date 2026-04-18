@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { getMarketSessionPresentation } from '@papervest/shared-types';
 
 import { AppButtonLink } from '@/components/app-button';
 import { AppCard } from '@/components/app-card';
@@ -8,10 +9,12 @@ import { EmptyState } from '@/components/empty-state';
 import { InlineNotice } from '@/components/inline-notice';
 import { SectionHeader } from '@/components/section-header';
 import { liveQuoteRefreshOptions } from '@/lib/market-data-refresh';
+import { getMarketSessionChipClass } from '@/lib/market-session';
 import { queryKeys } from '@/lib/query-keys';
 import { webApi } from '@/lib/api';
 import {
   formatCurrency,
+  formatMarketTimestamp,
   formatPercent,
   formatSignedCurrency,
 } from '@/lib/formatters';
@@ -81,42 +84,61 @@ export default function WatchlistPage() {
           ) : watchlistQuery.data?.items.length ? (
             <div className="pv-list">
               {watchlistQuery.data.items.map((item) => (
-                <div className="pv-list-row pv-list-row-wrap" key={item.symbol}>
-                  <div className="pv-list-primary">
-                    <span className="pv-list-symbol">{item.symbol}</span>
-                    <span className="pv-list-company">{item.companyName}</span>
-                    <span className="pv-kicker">Saved for quick access and trade planning.</span>
-                  </div>
-                  <div className="pv-list-secondary">
-                    <strong>
-                      {item.currentPrice == null ? '...' : formatCurrency(item.currentPrice)}
-                    </strong>
-                    {item.dailyChange != null && item.dailyChangePercent != null ? (
-                      <span className={item.dailyChange >= 0 ? 'pv-positive' : 'pv-negative'}>
-                        {formatSignedCurrency(item.dailyChange)} · {formatPercent(item.dailyChangePercent)}
-                      </span>
-                    ) : (
-                      <span className="pv-kicker">Quote unavailable</span>
-                    )}
-                  </div>
-                  <div className="pv-action-cluster">
-                    <AppButtonLink
-                      href={`/stocks/${item.symbol}?companyName=${encodeURIComponent(item.companyName)}`}
-                      variant="secondary"
-                    >
-                      Open
-                    </AppButtonLink>
-                    <button
-                      className="pv-button danger"
-                      disabled={removeMutation.isPending}
-                      onClick={() => {
-                        void removeMutation.mutateAsync(item.symbol);
-                      }}
-                    >
-                      {removeMutation.isPending ? 'Working...' : 'Remove'}
-                    </button>
-                  </div>
-                </div>
+                (() => {
+                  const marketSession = getMarketSessionPresentation(item.marketSession ?? 'CLOSED');
+
+                  return (
+                    <div className="pv-list-row pv-list-row-wrap" key={item.symbol}>
+                      <div className="pv-list-primary">
+                        <span className="pv-list-symbol-line">
+                          <span className="pv-list-symbol">{item.symbol}</span>
+                          <span className={`pv-chip ${getMarketSessionChipClass(item.marketSession ?? 'CLOSED')}`}>
+                            {marketSession.statusLabel}
+                          </span>
+                        </span>
+                        <span className="pv-list-company">{item.companyName}</span>
+                        {item.quoteTimestamp ? (
+                          <span className="pv-list-meta-line">
+                            <span>{marketSession.priceLabel}</span>
+                            <span>{formatMarketTimestamp(item.quoteTimestamp, item.marketTimezone ?? undefined)}</span>
+                          </span>
+                        ) : (
+                          <span className="pv-kicker">Saved for quick access and trade planning.</span>
+                        )}
+                      </div>
+                      <div className="pv-list-secondary">
+                        <strong>
+                          {item.currentPrice == null ? '...' : formatCurrency(item.currentPrice)}
+                        </strong>
+                        {item.dailyChange != null && item.dailyChangePercent != null ? (
+                          <span className={item.dailyChange >= 0 ? 'pv-positive' : 'pv-negative'}>
+                            {formatSignedCurrency(item.dailyChange)} · {formatPercent(item.dailyChangePercent)}
+                          </span>
+                        ) : (
+                          <span className="pv-kicker">Quote unavailable</span>
+                        )}
+                        <span className="pv-kicker">{marketSession.changeLabel}</span>
+                      </div>
+                      <div className="pv-action-cluster">
+                        <AppButtonLink
+                          href={`/stocks/${item.symbol}?companyName=${encodeURIComponent(item.companyName)}`}
+                          variant="secondary"
+                        >
+                          Open
+                        </AppButtonLink>
+                        <button
+                          className="pv-button danger"
+                          disabled={removeMutation.isPending}
+                          onClick={() => {
+                            void removeMutation.mutateAsync(item.symbol);
+                          }}
+                        >
+                          {removeMutation.isPending ? 'Working...' : 'Remove'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()
               ))}
             </div>
           ) : (

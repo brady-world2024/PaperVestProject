@@ -9,12 +9,14 @@ import { EmptyState } from '../../components/feedback/EmptyState';
 import { SkeletonBlock } from '../../components/feedback/SkeletonBlock';
 import { ScreenContainer } from '../../components/layout/ScreenContainer';
 import { SectionHeader } from '../../components/layout/SectionHeader';
+import { MarketSessionBadge } from '../../components/market/MarketSessionBadge';
 import { AppStackParamList } from '../../navigation/RootNavigator';
 import { getWatchlist, removeWatchlistItem } from '../../services/api/papervestApi';
 import { liveQuoteRefreshOptions } from '../../services/api/market-data-refresh';
 import { queryKeys } from '../../services/api/queryKeys';
 import { appTheme } from '../../theme';
-import { formatCurrency, formatPercent } from '../../utils/formatters';
+import { formatCurrency, formatMarketTimestamp, formatPercent } from '../../utils/formatters';
+import { describeMarketSession } from '../../utils/marketSession';
 
 export function WatchlistScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
@@ -58,22 +60,32 @@ export function WatchlistScreen() {
       ) : watchlistQuery.data?.items.length ? (
         watchlistQuery.data.items.map((item) => {
           const positive = (item.dailyChange ?? 0) >= 0;
+          const marketSession = describeMarketSession(item.marketSession ?? 'CLOSED');
           return (
             <AppCard key={item.symbol}>
               <View style={styles.cardTop}>
                 <View style={styles.flex}>
-                  <Text
-                    onPress={() =>
-                      navigation.navigate('StockDetail', {
-                        symbol: item.symbol,
-                        companyName: item.companyName,
-                      })
-                    }
-                    style={styles.symbol}
-                  >
-                    {item.symbol}
-                  </Text>
+                  <View style={styles.symbolRow}>
+                    <Text
+                      onPress={() =>
+                        navigation.navigate('StockDetail', {
+                          symbol: item.symbol,
+                          companyName: item.companyName,
+                        })
+                      }
+                      style={styles.symbol}
+                    >
+                      {item.symbol}
+                    </Text>
+                    <MarketSessionBadge session={item.marketSession ?? 'CLOSED'} />
+                  </View>
                   <Text style={styles.company}>{item.companyName}</Text>
+                  <Text style={styles.meta}>{marketSession.priceLabel}</Text>
+                  {item.quoteTimestamp ? (
+                    <Text style={styles.meta}>
+                      {formatMarketTimestamp(item.quoteTimestamp, item.marketTimezone ?? undefined)}
+                    </Text>
+                  ) : null}
                 </View>
                 <View style={styles.actionColumn}>
                   <Text style={styles.price}>
@@ -84,6 +96,7 @@ export function WatchlistScreen() {
                       {formatCurrency(item.dailyChange)} · {formatPercent(item.dailyChangePercent)}
                     </Text>
                   ) : null}
+                  <Text style={styles.meta}>{marketSession.changeLabel}</Text>
                 </View>
               </View>
 
@@ -134,6 +147,12 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 4,
   },
+  symbolRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: appTheme.spacing.sm,
+    flexWrap: 'wrap',
+  },
   symbol: {
     color: appTheme.colors.textPrimary,
     fontSize: appTheme.typography.heading,
@@ -146,6 +165,7 @@ const styles = StyleSheet.create({
   actionColumn: {
     alignItems: 'flex-end',
     gap: 4,
+    flexShrink: 1,
   },
   price: {
     color: appTheme.colors.textPrimary,
@@ -155,6 +175,11 @@ const styles = StyleSheet.create({
   change: {
     fontSize: appTheme.typography.caption,
     fontWeight: '700',
+  },
+  meta: {
+    color: appTheme.colors.textSecondary,
+    fontSize: appTheme.typography.micro,
+    textAlign: 'right',
   },
   positive: {
     color: appTheme.colors.positive,

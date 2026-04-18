@@ -14,7 +14,10 @@ public record StockQuote(
 		BigDecimal lowPrice,
 		BigDecimal previousClose,
 		Instant quoteTimestamp,
-		boolean stale
+		boolean stale,
+		MarketSessionState marketSession,
+		boolean tradingEnabled,
+		String marketTimezone
 ) {
 	public StockQuote withCompanyName(String updatedCompanyName) {
 		return new StockQuote(
@@ -28,7 +31,10 @@ public record StockQuote(
 				lowPrice,
 				previousClose,
 				quoteTimestamp,
-				stale
+				stale,
+				marketSession,
+				tradingEnabled,
+				marketTimezone
 		);
 	}
 
@@ -44,7 +50,33 @@ public record StockQuote(
 				lowPrice,
 				previousClose,
 				quoteTimestamp,
-				updatedStale
+				updatedStale,
+				marketSession,
+				tradingEnabled,
+				marketTimezone
+		);
+	}
+
+	public StockQuote withMarketContext(
+			MarketSessionState updatedMarketSession,
+			boolean updatedTradingEnabled,
+			String updatedMarketTimezone
+	) {
+		return new StockQuote(
+				symbol,
+				companyName,
+				currentPrice,
+				dailyChange,
+				dailyChangePercent,
+				openPrice,
+				highPrice,
+				lowPrice,
+				previousClose,
+				quoteTimestamp,
+				stale,
+				updatedMarketSession,
+				updatedTradingEnabled,
+				updatedMarketTimezone
 		);
 	}
 }

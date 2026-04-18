@@ -9,6 +9,7 @@ import { EmptyState } from '../../components/feedback/EmptyState';
 import { SkeletonBlock } from '../../components/feedback/SkeletonBlock';
 import { ScreenContainer } from '../../components/layout/ScreenContainer';
 import { SectionHeader } from '../../components/layout/SectionHeader';
+import { MarketSessionBadge } from '../../components/market/MarketSessionBadge';
 import { MetricCard } from '../../components/portfolio/MetricCard';
 import { AppStackParamList } from '../../navigation/RootNavigator';
 import { getPortfolio } from '../../services/api/papervestApi';
@@ -17,10 +18,12 @@ import { queryKeys } from '../../services/api/queryKeys';
 import { appTheme } from '../../theme';
 import {
   formatCurrency,
+  formatMarketTimestamp,
   formatPercent,
   formatShares,
   formatSignedCurrency,
 } from '../../utils/formatters';
+import { describeMarketSession } from '../../utils/marketSession';
 
 export function PortfolioScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
@@ -103,62 +106,76 @@ export function PortfolioScreen() {
           </>
         ) : portfolioQuery.data?.holdings.length ? (
           portfolioQuery.data.holdings.map((holding) => (
-            <AppCard key={holding.symbol}>
-              <View style={styles.rowTop}>
-                <View style={styles.flex}>
-                  <Text
-                    onPress={() =>
-                      navigation.navigate('StockDetail', {
-                        symbol: holding.symbol,
-                        companyName: holding.companyName,
-                      })
-                    }
-                    style={styles.symbol}
-                  >
-                    {holding.symbol}
-                  </Text>
-                  <Text style={styles.company}>{holding.companyName}</Text>
-                </View>
-                <View style={styles.valueColumn}>
-                  <Text style={styles.value}>{formatCurrency(holding.marketValue)}</Text>
-                  <Text
-                    style={[
-                      styles.pnl,
-                      holding.unrealizedPnl >= 0 ? styles.positive : styles.negative,
-                    ]}
-                  >
-                    {formatSignedCurrency(holding.unrealizedPnl)} · {formatPercent(holding.unrealizedPnlPercent)}
-                  </Text>
-                </View>
-              </View>
+            (() => {
+              const marketSession = describeMarketSession(holding.marketSession ?? 'CLOSED');
 
-              <View style={styles.holdingStats}>
-                <MetricCard
-                  label="Shares"
-                  value={formatShares(holding.quantity)}
-                  style={styles.holdingStatCard}
-                  labelStyle={styles.holdingStatLabel}
-                  valueStyle={styles.holdingStatValue}
-                  valueNumberOfLines={1}
-                />
-                <MetricCard
-                  label="Avg cost"
-                  value={formatCurrency(holding.averageCost)}
-                  style={styles.holdingStatCard}
-                  labelStyle={styles.holdingStatLabel}
-                  valueStyle={styles.holdingStatValue}
-                  valueNumberOfLines={1}
-                />
-                <MetricCard
-                  label="Price"
-                  value={formatCurrency(holding.currentPrice)}
-                  style={styles.holdingStatCard}
-                  labelStyle={styles.holdingStatLabel}
-                  valueStyle={styles.holdingStatValue}
-                  valueNumberOfLines={1}
-                />
-              </View>
-            </AppCard>
+              return (
+                <AppCard key={holding.symbol}>
+                  <View style={styles.rowTop}>
+                    <View style={styles.flex}>
+                      <View style={styles.symbolRow}>
+                        <Text
+                          onPress={() =>
+                            navigation.navigate('StockDetail', {
+                              symbol: holding.symbol,
+                              companyName: holding.companyName,
+                            })
+                          }
+                          style={styles.symbol}
+                        >
+                          {holding.symbol}
+                        </Text>
+                        <MarketSessionBadge session={holding.marketSession ?? 'CLOSED'} />
+                      </View>
+                      <Text style={styles.company}>{holding.companyName}</Text>
+                      {holding.quoteTimestamp ? (
+                        <Text style={styles.quoteMeta}>
+                          {marketSession.priceLabel} · {formatMarketTimestamp(holding.quoteTimestamp, holding.marketTimezone ?? undefined)}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <View style={styles.valueColumn}>
+                      <Text style={styles.value}>{formatCurrency(holding.marketValue)}</Text>
+                      <Text
+                        style={[
+                          styles.pnl,
+                          holding.unrealizedPnl >= 0 ? styles.positive : styles.negative,
+                        ]}
+                      >
+                        {formatSignedCurrency(holding.unrealizedPnl)} · {formatPercent(holding.unrealizedPnlPercent)}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.holdingStats}>
+                    <MetricCard
+                      label="Shares"
+                      value={formatShares(holding.quantity)}
+                      style={styles.holdingStatCard}
+                      labelStyle={styles.holdingStatLabel}
+                      valueStyle={styles.holdingStatValue}
+                      valueNumberOfLines={1}
+                    />
+                    <MetricCard
+                      label="Avg cost"
+                      value={formatCurrency(holding.averageCost)}
+                      style={styles.holdingStatCard}
+                      labelStyle={styles.holdingStatLabel}
+                      valueStyle={styles.holdingStatValue}
+                      valueNumberOfLines={1}
+                    />
+                    <MetricCard
+                      label="Price"
+                      value={formatCurrency(holding.currentPrice)}
+                      style={styles.holdingStatCard}
+                      labelStyle={styles.holdingStatLabel}
+                      valueStyle={styles.holdingStatValue}
+                      valueNumberOfLines={1}
+                    />
+                  </View>
+                </AppCard>
+              );
+            })()
           ))
         ) : (
           <EmptyState
@@ -211,6 +228,12 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 4,
   },
+  symbolRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: appTheme.spacing.sm,
+    flexWrap: 'wrap',
+  },
   symbol: {
     color: appTheme.colors.textPrimary,
     fontSize: appTheme.typography.heading,
@@ -219,6 +242,10 @@ const styles = StyleSheet.create({
   company: {
     color: appTheme.colors.textSecondary,
     fontSize: appTheme.typography.caption,
+  },
+  quoteMeta: {
+    color: appTheme.colors.textSecondary,
+    fontSize: appTheme.typography.micro,
   },
   valueColumn: {
     alignItems: 'flex-end',

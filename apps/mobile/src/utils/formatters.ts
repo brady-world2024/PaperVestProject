@@ -29,3 +29,29 @@ export function formatDateTime(value: string) {
     minute: '2-digit',
   }).format(new Date(value));
 }
+
+export function formatMarketTimestamp(value: string, timezone = 'America/New_York') {
+  const date = new Date(value);
+  const time = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date);
+
+  return `Updated at ${time} ${formatTimeZoneLabel(date, timezone)}`;
+}
+
+function formatTimeZoneLabel(date: Date, timezone: string) {
+  if (timezone === 'America/New_York') {
+    return 'ET';
+  }
+
+  const timeZoneName = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    timeZoneName: 'short',
+  })
+    .formatToParts(date)
+    .find((part) => part.type === 'timeZoneName')?.value;
+
+  return timeZoneName ?? timezone;
+}

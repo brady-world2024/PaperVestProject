@@ -13,6 +13,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -44,7 +45,7 @@ class MarketDataServiceTest {
 				Duration.ofMinutes(5),
 				List.of(new MarketDataProperties.HomeSymbol("AAPL", "Apple")),
 				new MarketDataProperties.FinnhubProperties("https://finnhub.io/api/v1", "test-key")
-		));
+		), Clock.fixed(Instant.parse("2026-01-15T15:00:00Z"), java.time.ZoneOffset.UTC));
 	}
 
 	@Test

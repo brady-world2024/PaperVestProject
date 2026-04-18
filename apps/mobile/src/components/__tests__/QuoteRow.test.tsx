@@ -18,11 +18,16 @@ describe('QuoteRow', () => {
           previousClose: 196.7,
           quoteTimestamp: '2026-03-20T00:00:00Z',
           stale: false,
+          marketSession: 'OPEN',
+          tradingEnabled: true,
+          marketTimezone: 'America/New_York',
         }}
       />
     );
 
     expect(screen.getByText('AAPL')).toBeTruthy();
+    expect(screen.getByText('Open')).toBeTruthy();
     expect(screen.getByText('$198.22')).toBeTruthy();
+    expect(screen.getByText('Real-time price')).toBeTruthy();
   });
 });

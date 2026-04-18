@@ -98,10 +98,10 @@ public class ConditionalOrderExecutionService {
 			}
 
 			log.info(
-					"Conditional order scheduler evaluated symbol={} orderCount={} price={}",
-					symbol,
-					orders.size(),
-					quote.currentPrice()
+				"Conditional order scheduler evaluated symbol={} orderCount={} price={}",
+				symbol,
+				orders.size(),
+				quote.currentPrice()
 			);
 
 			for (ConditionalOrder order : orders) {
@@ -114,6 +114,15 @@ public class ConditionalOrderExecutionService {
 				}
 
 				transitionService.touchLastCheckedPrice(order, quote.currentPrice());
+				if (!quote.tradingEnabled()) {
+					log.info(
+							"Conditional order scheduler skipped symbol={} orderId={} session={} reason=market_closed",
+							symbol,
+							order.getId(),
+							quote.marketSession()
+					);
+					continue;
+				}
 				if (!priceConditionMet(order, quote.currentPrice())) {
 					continue;
 				}
@@ -202,6 +211,27 @@ public class ConditionalOrderExecutionService {
 					"Conditional order execution postponed orderId={} symbol={} reason=market_data_unavailable reactivated={}",
 					executingOrder.getId(),
 					executingOrder.getSymbol(),
+					reactivated
+			);
+			return;
+		}
+
+		if (!quote.tradingEnabled()) {
+			boolean reactivated = transitionService.reactivate(
+					executingOrder,
+					quote.currentPrice(),
+					ConditionalOrderFailureCode.MARKET_CLOSED.name(),
+					"Regular market hours ended before the conditional order could execute; order returned to active",
+					Map.of(
+							"marketSession", quote.marketSession().name(),
+							"quoteTimestamp", quote.quoteTimestamp().toString()
+					)
+			);
+			log.info(
+					"Conditional order execution returned to active orderId={} symbol={} session={} reactivated={} reason=market_closed",
+					executingOrder.getId(),
+					executingOrder.getSymbol(),
+					quote.marketSession(),
 					reactivated
 			);
 			return;

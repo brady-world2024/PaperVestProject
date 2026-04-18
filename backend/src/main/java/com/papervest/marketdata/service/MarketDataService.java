@@ -4,6 +4,8 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.papervest.common.exception.ApiException;
 import com.papervest.common.util.SymbolUtils;
+import com.papervest.marketdata.model.MarketSessionState;
+import com.papervest.marketdata.model.MarketStatusSnapshot;
 import com.papervest.marketdata.config.MarketDataProperties;
 import com.papervest.marketdata.model.HomeMarketResponse;
 import com.papervest.marketdata.model.StockHistoryRange;
@@ -16,21 +18,37 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.List;
 
 @Service
 public class MarketDataService {
 
 	private static final Logger log = LoggerFactory.getLogger(MarketDataService.class);
+	private static final String US_EXCHANGE = "US";
+	private static final String DEFAULT_MARKET_TIMEZONE = "America/New_York";
+	private static final LocalTime PRE_MARKET_START = LocalTime.of(4, 0);
+	private static final LocalTime REGULAR_MARKET_START = LocalTime.of(9, 30);
+	private static final LocalTime REGULAR_MARKET_END = LocalTime.of(16, 0);
+	private static final LocalTime AFTER_HOURS_END = LocalTime.of(20, 0);
+
 	private final MarketDataProperties properties;
 	private final MarketDataProvider activeProvider;
 	private final Cache<String, StockQuote> quoteCache;
 	private final Cache<String, StockPriceHistory> historyCache;
 	private final Cache<String, List<StockSearchResult>> searchCache;
+	private final Cache<String, MarketStatusSnapshot> marketStatusCache;
+	private final Clock clock;
 
-	public MarketDataService(MarketDataProviderRouter providerRouter, MarketDataProperties properties) {
+	public MarketDataService(MarketDataProviderRouter providerRouter, MarketDataProperties properties, Clock clock) {
 		this.properties = properties;
 		this.activeProvider = providerRouter.activeProvider();
+		this.clock = clock;
 		this.quoteCache = Caffeine.newBuilder()
 				.expireAfterWrite(properties.quoteCacheTtl())
 				.maximumSize(512)
@@ -42,6 +60,10 @@ public class MarketDataService {
 		this.searchCache = Caffeine.newBuilder()
 				.expireAfterWrite(properties.searchCacheTtl())
 				.maximumSize(128)
+				.build();
+		this.marketStatusCache = Caffeine.newBuilder()
+				.expireAfterWrite(properties.quoteCacheTtl())
+				.maximumSize(8)
 				.build();
 		log.info(
 				"Market data service initialized provider={} quoteCacheTtl={} historyCacheTtl={} searchCacheTtl={}",
@@ -70,7 +92,7 @@ public class MarketDataService {
 		log.debug("Market data quote cache miss symbol={} provider={}", normalizedSymbol, activeProvider.providerType());
 
 		try {
-			StockQuote fetched = activeProvider.fetchQuote(normalizedSymbol);
+			StockQuote fetched = enrichQuote(activeProvider.fetchQuote(normalizedSymbol));
 			StockQuote enriched = mergeCompanyName(fetched, companyNameHint);
 			quoteCache.put(normalizedSymbol, enriched);
 			return enriched;
@@ -173,6 +195,77 @@ public class MarketDataService {
 			return quote;
 		}
 		return quote.withCompanyName(resolveCompanyName(quote.symbol(), companyNameHint));
+	}
+
+	private StockQuote enrichQuote(StockQuote quote) {
+		MarketStatusSnapshot marketStatus = getMarketStatus(US_EXCHANGE);
+		String marketTimezone = marketStatus == null || marketStatus.timezone() == null || marketStatus.timezone().isBlank()
+				? DEFAULT_MARKET_TIMEZONE
+				: marketStatus.timezone();
+		MarketSessionState marketSession = classifySession(quote.quoteTimestamp(), marketStatus, marketTimezone);
+		return quote.withMarketContext(marketSession, marketSession == MarketSessionState.OPEN, marketTimezone);
+	}
+
+	private MarketStatusSnapshot getMarketStatus(String exchange) {
+		MarketStatusSnapshot cached = marketStatusCache.getIfPresent(exchange);
+		if (cached != null) {
+			return cached;
+		}
+
+		MarketStatusSnapshot fetched = activeProvider.fetchMarketStatus(exchange);
+		marketStatusCache.put(exchange, fetched);
+		return fetched;
+	}
+
+	private MarketSessionState classifySession(
+			Instant quoteTimestamp,
+			MarketStatusSnapshot marketStatus,
+			String timezone
+	) {
+		if (marketStatus == null) {
+			return MarketSessionState.CLOSED;
+		}
+
+		String session = marketStatus.session() == null ? "" : marketStatus.session().trim().toLowerCase();
+		if ("regular".equals(session) && marketStatus.open()) {
+			return MarketSessionState.OPEN;
+		}
+
+		ZoneId zoneId = ZoneId.of(timezone);
+		Instant statusInstant = marketStatus.statusTimestamp() == null ? clock.instant() : marketStatus.statusTimestamp();
+		ZonedDateTime statusTime = statusInstant.atZone(zoneId);
+		ZonedDateTime quoteTime = quoteTimestamp.atZone(zoneId);
+
+		return switch (session) {
+			case "pre-market" -> isQuoteWithinSessionWindow(
+					quoteTime,
+					statusTime,
+					PRE_MARKET_START,
+					REGULAR_MARKET_START
+			) ? MarketSessionState.PRE_MARKET : MarketSessionState.CLOSED;
+			case "post-market" -> isQuoteWithinSessionWindow(
+					quoteTime,
+					statusTime,
+					REGULAR_MARKET_END,
+					AFTER_HOURS_END
+			) ? MarketSessionState.AFTER_HOURS : MarketSessionState.CLOSED;
+			default -> MarketSessionState.CLOSED;
+		};
+	}
+
+	private boolean isQuoteWithinSessionWindow(
+			ZonedDateTime quoteTime,
+			ZonedDateTime statusTime,
+			LocalTime start,
+			LocalTime end
+	) {
+		LocalDate statusDate = statusTime.toLocalDate();
+		if (!quoteTime.toLocalDate().equals(statusDate)) {
+			return false;
+		}
+
+		LocalTime quoteLocalTime = quoteTime.toLocalTime();
+		return !quoteLocalTime.isBefore(start) && quoteLocalTime.isBefore(end);
 	}
 
 	public record QuoteRequest(String symbol, String companyName) {

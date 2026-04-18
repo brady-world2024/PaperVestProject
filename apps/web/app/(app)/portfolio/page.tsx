@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
+import { getMarketSessionPresentation } from '@papervest/shared-types';
 
 import { AppButtonLink } from '@/components/app-button';
 import { AppCard } from '@/components/app-card';
@@ -10,11 +11,13 @@ import { InlineNotice } from '@/components/inline-notice';
 import { MetricCard } from '@/components/metric-card';
 import { SectionHeader } from '@/components/section-header';
 import { liveQuoteRefreshOptions } from '@/lib/market-data-refresh';
+import { getMarketSessionChipClass } from '@/lib/market-session';
 import { queryKeys } from '@/lib/query-keys';
 import { webApi } from '@/lib/api';
 import {
   formatCurrency,
   formatDateTime,
+  formatMarketTimestamp,
   formatPercent,
   formatShares,
   formatSignedCurrency,
@@ -119,25 +122,43 @@ export default function PortfolioPage() {
           ) : holdings.length ? (
             <div className="pv-list">
               {holdings.map((holding) => (
-                <Link
-                  key={holding.symbol}
-                  className="pv-list-row"
-                  href={`/stocks/${holding.symbol}?companyName=${encodeURIComponent(holding.companyName)}`}
-                >
-                  <div className="pv-list-primary">
-                    <span className="pv-list-symbol">{holding.symbol}</span>
-                    <span className="pv-list-company">{holding.companyName}</span>
-                    <span className="pv-kicker">
-                      {formatShares(holding.quantity)} shares · Avg {formatCurrency(holding.averageCost)}
-                    </span>
-                  </div>
-                  <div className="pv-list-secondary">
-                    <strong>{formatCurrency(holding.marketValue)}</strong>
-                    <span className={holding.unrealizedPnl >= 0 ? 'pv-positive' : 'pv-negative'}>
-                      {formatSignedCurrency(holding.unrealizedPnl)} · {formatPercent(holding.unrealizedPnlPercent)}
-                    </span>
-                  </div>
-                </Link>
+                (() => {
+                  const marketSession = getMarketSessionPresentation(holding.marketSession ?? 'CLOSED');
+
+                  return (
+                    <Link
+                      key={holding.symbol}
+                      className="pv-list-row"
+                      href={`/stocks/${holding.symbol}?companyName=${encodeURIComponent(holding.companyName)}`}
+                    >
+                      <div className="pv-list-primary">
+                        <span className="pv-list-symbol-line">
+                          <span className="pv-list-symbol">{holding.symbol}</span>
+                          <span className={`pv-chip ${getMarketSessionChipClass(holding.marketSession ?? 'CLOSED')}`}>
+                            {marketSession.statusLabel}
+                          </span>
+                        </span>
+                        <span className="pv-list-company">{holding.companyName}</span>
+                        <span className="pv-list-meta-line">
+                          <span>{formatShares(holding.quantity)} shares</span>
+                          <span>Avg {formatCurrency(holding.averageCost)}</span>
+                        </span>
+                        {holding.quoteTimestamp ? (
+                          <span className="pv-list-meta-line">
+                            <span>{marketSession.priceLabel}</span>
+                            <span>{formatMarketTimestamp(holding.quoteTimestamp, holding.marketTimezone ?? undefined)}</span>
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="pv-list-secondary">
+                        <strong>{formatCurrency(holding.marketValue)}</strong>
+                        <span className={holding.unrealizedPnl >= 0 ? 'pv-positive' : 'pv-negative'}>
+                          {formatSignedCurrency(holding.unrealizedPnl)} · {formatPercent(holding.unrealizedPnlPercent)}
+                        </span>
+                      </div>
+                    </Link>
+                  );
+                })()
               ))}
             </div>
           ) : (
@@ -173,12 +194,20 @@ export default function PortfolioPage() {
                     href={`/stocks/${trade.symbol}?companyName=${encodeURIComponent(trade.companyName)}`}
                   >
                     <div className="pv-list-primary">
-                      <span className="pv-list-symbol">{trade.symbol}</span>
+                      <span className="pv-list-symbol-line">
+                        <span className="pv-list-symbol">{trade.symbol}</span>
+                        <span className={`pv-chip ${trade.side === 'BUY' ? 'buy' : 'sell'}`}>
+                          {trade.side}
+                        </span>
+                      </span>
                       <span className="pv-list-company">{trade.companyName}</span>
-                      <span className="pv-kicker">{formatDateTime(trade.executedAt)}</span>
+                      <span className="pv-list-meta-line">
+                        <span>{formatShares(trade.quantity)}</span>
+                        <span>{formatDateTime(trade.executedAt)}</span>
+                      </span>
                     </div>
                     <div className="pv-list-secondary">
-                      <strong>{formatShares(trade.quantity)} shares</strong>
+                      <strong>{formatCurrency(trade.executedPrice)}</strong>
                       <span className={trade.realizedPnl >= 0 ? 'pv-positive' : 'pv-negative'}>
                         {formatSignedCurrency(trade.realizedPnl)}
                       </span>

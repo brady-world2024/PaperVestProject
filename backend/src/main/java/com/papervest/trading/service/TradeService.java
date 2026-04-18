@@ -147,6 +147,7 @@ public class TradeService {
 		StockQuote quote = executionQuote == null
 				? marketDataService.getQuote(normalizedSymbol, request.companyName())
 				: executionQuote;
+		validateTradingWindow(quote);
 
 		return transactionTemplate.execute(status ->
 				persistTrade(
@@ -158,6 +159,23 @@ public class TradeService {
 						side,
 						quote
 				)
+		);
+	}
+
+	private void validateTradingWindow(StockQuote quote) {
+		if (quote.tradingEnabled()) {
+			return;
+		}
+
+		log.info(
+				"Trade rejected symbol={} reason=market_closed session={} quoteTimestamp={}",
+				quote.symbol(),
+				quote.marketSession(),
+				quote.quoteTimestamp()
+		);
+		throw new InvalidTradeException(
+				"MARKET_CLOSED",
+				"Paper trading is only available during regular market hours"
 		);
 	}
 

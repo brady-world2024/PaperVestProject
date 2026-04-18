@@ -84,7 +84,11 @@ public class WatchlistService {
 				quote == null ? null : quote.currentPrice(),
 				quote == null ? null : quote.dailyChange(),
 				quote == null ? null : quote.dailyChangePercent(),
+				quote == null ? null : quote.quoteTimestamp(),
 				quote != null && quote.stale(),
+				quote == null ? null : quote.marketSession(),
+				quote != null && quote.tradingEnabled(),
+				quote == null ? null : quote.marketTimezone(),
 				item.getCreatedAt()
 		);
 	}

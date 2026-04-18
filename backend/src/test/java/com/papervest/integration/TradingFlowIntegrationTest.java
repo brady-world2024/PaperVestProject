@@ -3,6 +3,7 @@ package com.papervest.integration;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.papervest.common.web.RequestIdFilter;
+import com.papervest.marketdata.model.MarketSessionState;
 import com.papervest.marketdata.model.StockHistoryRange;
 import com.papervest.marketdata.model.StockPriceBar;
 import com.papervest.marketdata.model.StockPriceHistory;
@@ -76,8 +77,11 @@ class TradingFlowIntegrationTest {
 				new BigDecimal("101.0000"),
 				new BigDecimal("98.0000"),
 				new BigDecimal("98.5000"),
-				Instant.parse("2026-01-01T10:00:00Z"),
-				false
+				Instant.parse("2026-01-02T15:00:00Z"),
+				false,
+				MarketSessionState.OPEN,
+				true,
+				"America/New_York"
 		);
 
 		aaplHistory = new StockPriceHistory(
@@ -183,6 +187,27 @@ class TradingFlowIntegrationTest {
 				.andExpect(jsonPath("$.points[0].closePrice").value(100.0000));
 	}
 
+	@Test
+	void authenticatedTradeEndpointRejectsOrdersWhenMarketIsClosed() throws Exception {
+		String accessToken = registerAndExtractAccessToken();
+		when(marketDataService.getQuote("AAPL", "Apple Inc.")).thenReturn(closedQuote());
+
+		mockMvc.perform(post("/api/trades/buy")
+						.header("Authorization", "Bearer " + accessToken)
+						.header("X-Idempotency-Key", "buy-closed")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "symbol": "AAPL",
+								  "companyName": "Apple Inc.",
+								  "quantity": 1
+								}
+								"""))
+				.andExpect(status().isUnprocessableEntity())
+				.andExpect(jsonPath("$.code").value("MARKET_CLOSED"))
+				.andExpect(jsonPath("$.message").value("Paper trading is only available during regular market hours"));
+	}
+
 	private String registerAndExtractAccessToken() throws Exception {
 		String email = "alice+" + UUID.randomUUID() + "@example.com";
 		MvcResult result = mockMvc.perform(post("/api/auth/register")
@@ -200,5 +225,24 @@ class TradingFlowIntegrationTest {
 
 		JsonNode jsonNode = objectMapper.readTree(result.getResponse().getContentAsString());
 		return jsonNode.path("accessToken").asText();
+	}
+
+	private StockQuote closedQuote() {
+		return new StockQuote(
+				"AAPL",
+				"Apple Inc.",
+				new BigDecimal("100.0000"),
+				new BigDecimal("1.5000"),
+				new BigDecimal("1.25"),
+				new BigDecimal("99.0000"),
+				new BigDecimal("101.0000"),
+				new BigDecimal("98.0000"),
+				new BigDecimal("98.5000"),
+				Instant.parse("2026-01-02T22:10:00Z"),
+				false,
+				MarketSessionState.AFTER_HOURS,
+				false,
+				"America/New_York"
+		);
 	}
 }

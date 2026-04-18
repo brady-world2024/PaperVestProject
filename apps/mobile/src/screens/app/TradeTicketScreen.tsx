@@ -13,6 +13,7 @@ import { AppButton } from '../../components/common/AppButton';
 import { InlineNotice } from '../../components/feedback/InlineNotice';
 import { AppTextField } from '../../components/form/AppTextField';
 import { ScreenContainer } from '../../components/layout/ScreenContainer';
+import { MarketSessionBadge } from '../../components/market/MarketSessionBadge';
 import { AppStackParamList } from '../../navigation/RootNavigator';
 import { getApiErrorMessage } from '../../services/api/client';
 import {
@@ -24,7 +25,8 @@ import {
 import { liveQuoteRefreshOptions } from '../../services/api/market-data-refresh';
 import { queryKeys } from '../../services/api/queryKeys';
 import { appTheme } from '../../theme';
-import { formatCurrency, formatShares } from '../../utils/formatters';
+import { formatCurrency, formatMarketTimestamp, formatShares } from '../../utils/formatters';
+import { describeMarketSession } from '../../utils/marketSession';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'TradeTicket'>;
 
@@ -86,9 +88,18 @@ export function TradeTicketScreen({ navigation, route }: Props) {
   const holding = portfolioQuery.data?.holdings.find((item) => item.symbol === symbol);
   const cashBalance = portfolioQuery.data?.summary.cashBalance ?? 0;
   const maxSellableQuantity = holding?.quantity ?? 0;
+  const marketSession = stockQuery.data ? describeMarketSession(stockQuery.data.marketSession) : null;
+  const tradingBlockedMessage = stockQuery.data && !stockQuery.data.tradingEnabled
+    ? `${marketSession?.statusLabel} session. Paper trading is only available during regular market hours.`
+    : null;
 
   const onSubmit = handleSubmit(({ quantity: rawQuantity }) => {
     const normalizedQuantity = normalizeTradeQuantity(rawQuantity);
+
+    if (tradingBlockedMessage) {
+      Alert.alert('Market closed', tradingBlockedMessage);
+      return;
+    }
 
     if (side === 'BUY' && estimatedTotal > cashBalance) {
       Alert.alert('Not enough virtual cash', 'Lower the quantity or choose a less expensive stock.');
@@ -133,11 +144,27 @@ export function TradeTicketScreen({ navigation, route }: Props) {
           message={getApiErrorMessage(tradeMutation.error, 'Unable to place trade')}
         />
       ) : null}
+      {tradingBlockedMessage ? <InlineNotice message={tradingBlockedMessage} /> : null}
 
       <View style={styles.summaryCard}>
-        <Text style={styles.summaryLabel}>Estimated execution</Text>
+        {stockQuery.data ? (
+          <View style={styles.summarySessionRow}>
+            <MarketSessionBadge session={stockQuery.data.marketSession} />
+            <Text style={styles.summaryLabel}>{marketSession?.priceLabel}</Text>
+          </View>
+        ) : (
+          <Text style={styles.summaryLabel}>Estimated execution</Text>
+        )}
         <Text style={styles.summaryPrice}>{formatCurrency(currentPrice)}</Text>
         <Text style={styles.summaryCaption}>{companyName ?? stockQuery.data?.companyName ?? symbol}</Text>
+        {stockQuery.data ? (
+          <>
+            <Text style={styles.summaryCaption}>{marketSession?.changeLabel}</Text>
+            <Text style={styles.summaryCaption}>
+              {formatMarketTimestamp(stockQuery.data.quoteTimestamp, stockQuery.data.marketTimezone)}
+            </Text>
+          </>
+        ) : null}
       </View>
 
       <Controller
@@ -174,6 +201,7 @@ export function TradeTicketScreen({ navigation, route }: Props) {
           void onSubmit();
         }}
         loading={tradeMutation.isPending}
+        disabled={Boolean(tradingBlockedMessage)}
       />
     </ScreenContainer>
   );
@@ -211,6 +239,12 @@ const styles = StyleSheet.create({
     padding: appTheme.spacing.xl,
     gap: appTheme.spacing.xs,
   },
+  summarySessionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: appTheme.spacing.sm,
+    flexWrap: 'wrap',
+  },
   summaryLabel: {
     color: appTheme.colors.textInverse,
     opacity: 0.84,
@@ -224,7 +258,7 @@ const styles = StyleSheet.create({
   summaryCaption: {
     color: appTheme.colors.textInverse,
     opacity: 0.88,
-    fontSize: appTheme.typography.body,
+    fontSize: appTheme.typography.caption,
   },
   infoCard: {
     backgroundColor: appTheme.colors.surface,

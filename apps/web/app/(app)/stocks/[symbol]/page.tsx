@@ -3,7 +3,7 @@
 import { useParams, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { StockHistoryRange } from '@papervest/shared-types';
+import { getMarketSessionPresentation, type StockHistoryRange } from '@papervest/shared-types';
 
 import { AppButton, AppButtonLink } from '@/components/app-button';
 import { AppCard } from '@/components/app-card';
@@ -13,11 +13,13 @@ import { SectionHeader } from '@/components/section-header';
 import { StockHistoryChart } from '@/components/stock-history-chart';
 import { TradeOrderCard } from '@/components/trade-order-card';
 import { liveQuoteRefreshOptions } from '@/lib/market-data-refresh';
+import { describeMarketSession, getMarketSessionChipClass } from '@/lib/market-session';
 import { queryKeys } from '@/lib/query-keys';
 import { webApi } from '@/lib/api';
 import {
   formatCurrency,
   formatDateTime,
+  formatMarketTimestamp,
   formatPercent,
   formatShares,
   formatSignedCurrency,
@@ -171,6 +173,11 @@ export default function StockDetailPage() {
     );
   }
 
+  const marketSession = describeMarketSession(quote.marketSession);
+  const tradingBlockedMessage = quote.tradingEnabled
+    ? null
+    : `${marketSession.statusLabel} session. Paper trading is only available during regular market hours.`;
+
   return (
     <main className="pv-page pv-stock-layout">
       <section className="pv-stack">
@@ -202,12 +209,21 @@ export default function StockDetailPage() {
 
           <div className="pv-stock-hero-grid">
             <div className="pv-stock-price-panel">
+              <div className="pv-stock-status-row">
+                <span className={`pv-chip ${getMarketSessionChipClass(quote.marketSession)}`}>
+                  {marketSession.statusLabel}
+                </span>
+                <span className="pv-kicker pv-kicker-inverse">{marketSession.priceLabel}</span>
+              </div>
               <div className="pv-stock-price">{formatCurrency(currentPrice)}</div>
               <div className={quote.dailyChange >= 0 ? 'pv-positive' : 'pv-negative'}>
                 {formatSignedCurrency(quote.dailyChange)} · {formatPercent(quote.dailyChangePercent)}
               </div>
               <span className="pv-kicker pv-kicker-inverse">
-                Last updated {formatDateTime(quote.quoteTimestamp)}
+                {marketSession.changeLabel}
+              </span>
+              <span className="pv-kicker pv-kicker-inverse">
+                {formatMarketTimestamp(quote.quoteTimestamp, quote.marketTimezone)}
               </span>
             </div>
 
@@ -235,48 +251,94 @@ export default function StockDetailPage() {
 
         <div className="pv-grid two">
           <AppCard>
-            <SectionHeader title="Quote metrics" />
-            <div className="pv-stock-metric-grid">
-              <MetricCard label="Open" value={formatCurrency(quote.openPrice)} />
-              <MetricCard label="High" value={formatCurrency(quote.highPrice)} />
-              <MetricCard label="Low" value={formatCurrency(quote.lowPrice)} />
-              <MetricCard label="Previous close" value={formatCurrency(quote.previousClose)} />
-              <MetricCard
-                label="Daily change"
-                value={formatSignedCurrency(quote.dailyChange)}
-                tone={quote.dailyChange >= 0 ? 'positive' : 'negative'}
-              />
-              <MetricCard
-                label="Daily return"
-                value={formatPercent(quote.dailyChangePercent)}
-                tone={quote.dailyChangePercent >= 0 ? 'positive' : 'negative'}
-              />
+            <SectionHeader
+              title="Quote summary"
+              subtitle="Current session context and key quote marks."
+            />
+            <div className="pv-stock-terminal">
+              <div className="pv-stock-terminal-head">
+                <span className={`pv-chip ${getMarketSessionChipClass(quote.marketSession)}`}>
+                  {marketSession.statusLabel}
+                </span>
+                <span className="pv-kicker">
+                  {marketSession.priceLabel} · {formatMarketTimestamp(quote.quoteTimestamp, quote.marketTimezone)}
+                </span>
+              </div>
+              <div className="pv-stock-terminal-grid">
+                <div className="pv-stock-terminal-row">
+                  <span className="pv-stock-terminal-label">Open</span>
+                  <strong className="pv-stock-terminal-value">{formatCurrency(quote.openPrice)}</strong>
+                </div>
+                <div className="pv-stock-terminal-row">
+                  <span className="pv-stock-terminal-label">Previous close</span>
+                  <strong className="pv-stock-terminal-value">{formatCurrency(quote.previousClose)}</strong>
+                </div>
+                <div className="pv-stock-terminal-row">
+                  <span className="pv-stock-terminal-label">Session high</span>
+                  <strong className="pv-stock-terminal-value">{formatCurrency(quote.highPrice)}</strong>
+                </div>
+                <div className="pv-stock-terminal-row">
+                  <span className="pv-stock-terminal-label">Session low</span>
+                  <strong className="pv-stock-terminal-value">{formatCurrency(quote.lowPrice)}</strong>
+                </div>
+                <div className="pv-stock-terminal-row">
+                  <span className="pv-stock-terminal-label">{marketSession.changeLabel}</span>
+                  <strong className={`pv-stock-terminal-value ${quote.dailyChange >= 0 ? 'pv-positive' : 'pv-negative'}`}>
+                    {formatSignedCurrency(quote.dailyChange)}
+                  </strong>
+                </div>
+                <div className="pv-stock-terminal-row">
+                  <span className="pv-stock-terminal-label">Change percent</span>
+                  <strong className={`pv-stock-terminal-value ${quote.dailyChangePercent >= 0 ? 'pv-positive' : 'pv-negative'}`}>
+                    {formatPercent(quote.dailyChangePercent)}
+                  </strong>
+                </div>
+              </div>
             </div>
           </AppCard>
 
           <AppCard>
-            <SectionHeader title="Position" />
-            <div className="pv-meta-row">
-              <span className="pv-kicker">Available cash</span>
-              <strong>{formatCurrency(cashBalance)}</strong>
-            </div>
-            <div className="pv-meta-row">
-              <span className="pv-kicker">Average cost</span>
-              <strong>{holding ? formatCurrency(holding.averageCost) : '$0.00'}</strong>
-            </div>
-            <div className="pv-meta-row">
-              <span className="pv-kicker">Market value</span>
-              <strong>{holding ? formatCurrency(holding.marketValue) : '$0.00'}</strong>
-            </div>
-            <div className="pv-meta-row">
-              <span className="pv-kicker">Shares owned</span>
-              <strong>{holding ? formatShares(holding.quantity) : '0'}</strong>
-            </div>
-            <div className="pv-meta-row">
-              <span className="pv-kicker">Unrealized P&amp;L</span>
-              <strong className={(holding?.unrealizedPnl ?? 0) >= 0 ? 'pv-positive' : 'pv-negative'}>
-                {holding ? formatSignedCurrency(holding.unrealizedPnl) : '$0.00'}
-              </strong>
+            <SectionHeader
+              title="Position summary"
+              subtitle="Holding state and sizing context from the backend."
+            />
+            <div className="pv-stock-terminal">
+              <div className="pv-stock-terminal-head">
+                <span className={`pv-chip ${getMarketSessionChipClass(quote.marketSession)}`}>
+                  {holding ? 'Position live' : 'No position'}
+                </span>
+                <span className="pv-kicker">
+                  Position source · {formatMarketTimestamp(quote.quoteTimestamp, quote.marketTimezone)}
+                </span>
+              </div>
+              <div className="pv-stock-terminal-grid">
+                <div className="pv-stock-terminal-row">
+                  <span className="pv-stock-terminal-label">Shares owned</span>
+                  <strong className="pv-stock-terminal-value">{holding ? formatShares(holding.quantity) : '0'}</strong>
+                </div>
+                <div className="pv-stock-terminal-row">
+                  <span className="pv-stock-terminal-label">Available cash</span>
+                  <strong className="pv-stock-terminal-value">{formatCurrency(cashBalance)}</strong>
+                </div>
+                <div className="pv-stock-terminal-row">
+                  <span className="pv-stock-terminal-label">Average cost</span>
+                  <strong className="pv-stock-terminal-value">{holding ? formatCurrency(holding.averageCost) : '$0.00'}</strong>
+                </div>
+                <div className="pv-stock-terminal-row">
+                  <span className="pv-stock-terminal-label">Market value</span>
+                  <strong className="pv-stock-terminal-value">{holding ? formatCurrency(holding.marketValue) : '$0.00'}</strong>
+                </div>
+                <div className="pv-stock-terminal-row">
+                  <span className="pv-stock-terminal-label">Current mark</span>
+                  <strong className="pv-stock-terminal-value">{formatCurrency(currentPrice)}</strong>
+                </div>
+                <div className="pv-stock-terminal-row">
+                  <span className="pv-stock-terminal-label">Unrealized P&amp;L</span>
+                  <strong className={`pv-stock-terminal-value ${(holding?.unrealizedPnl ?? 0) >= 0 ? 'pv-positive' : 'pv-negative'}`}>
+                    {holding ? formatSignedCurrency(holding.unrealizedPnl) : '$0.00'}
+                  </strong>
+                </div>
+              </div>
             </div>
           </AppCard>
         </div>
@@ -289,23 +351,30 @@ export default function StockDetailPage() {
 
         <AppCard>
           <SectionHeader title="Trade" />
-          <div className="pv-meta-row">
-            <span className="pv-kicker">Current quote</span>
-            <strong>{formatCurrency(currentPrice)}</strong>
-          </div>
-          <div className="pv-meta-row">
-            <span className="pv-kicker">Cash available</span>
-            <strong>{formatCurrency(cashBalance)}</strong>
-          </div>
+            <div className="pv-meta-row">
+              <span className="pv-kicker">{marketSession.priceLabel}</span>
+              <strong>{formatCurrency(currentPrice)}</strong>
+            </div>
+            <div className="pv-meta-row">
+              <span className="pv-kicker">Market session</span>
+              <strong>{marketSession.statusLabel}</strong>
+            </div>
+            <div className="pv-meta-row">
+              <span className="pv-kicker">Cash available</span>
+              <strong>{formatCurrency(cashBalance)}</strong>
+            </div>
           <div className="pv-meta-row">
             <span className="pv-kicker">Shares available</span>
             <strong>{formatShares(availableToSell)}</strong>
           </div>
-          <div className="pv-meta-row">
-            <span className="pv-kicker">Quote timestamp</span>
-            <strong>{formatDateTime(quote.quoteTimestamp)}</strong>
-          </div>
-        </AppCard>
+            <div className="pv-meta-row">
+              <span className="pv-kicker">Quote timestamp</span>
+              <strong>{formatMarketTimestamp(quote.quoteTimestamp, quote.marketTimezone)}</strong>
+            </div>
+            {tradingBlockedMessage ? (
+              <InlineNotice tone="info" message={tradingBlockedMessage} />
+            ) : null}
+          </AppCard>
 
         <TradeOrderCard
           title="Buy shares"
@@ -317,6 +386,7 @@ export default function StockDetailPage() {
           supportLabel="Execution source"
           supportValue="Current backend quote"
           pending={buyMutation.isPending}
+          externalBlockingMessage={tradingBlockedMessage}
           errorMessage={
             buyMutation.isError
               ? webApi.getApiErrorMessage(buyMutation.error, 'Unable to place buy order')
@@ -348,6 +418,7 @@ export default function StockDetailPage() {
           supportValue="Current backend holdings"
           buttonVariant="secondary"
           pending={sellMutation.isPending}
+          externalBlockingMessage={tradingBlockedMessage}
           errorMessage={
             sellMutation.isError
               ? webApi.getApiErrorMessage(sellMutation.error, 'Unable to place sell order')

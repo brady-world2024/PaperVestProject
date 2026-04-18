@@ -7,6 +7,8 @@ import com.papervest.common.exception.RateLimitExceededException;
 import com.papervest.common.exception.ResourceNotFoundException;
 import com.papervest.common.util.MoneyUtils;
 import com.papervest.marketdata.config.MarketDataProperties;
+import com.papervest.marketdata.model.MarketSessionState;
+import com.papervest.marketdata.model.MarketStatusSnapshot;
 import com.papervest.marketdata.model.StockHistoryRange;
 import com.papervest.marketdata.model.StockPriceBar;
 import com.papervest.marketdata.model.StockPriceHistory;
@@ -110,7 +112,28 @@ public class FinnhubMarketDataProvider implements MarketDataProvider {
 				MoneyUtils.scalePrice(decimal(response, "l")),
 				MoneyUtils.scalePrice(decimal(response, "pc")),
 				quoteTimestamp,
-				false
+				false,
+				MarketSessionState.CLOSED,
+				false,
+				"America/New_York"
+		);
+	}
+
+	@Override
+	public MarketStatusSnapshot fetchMarketStatus(String exchange) {
+		JsonNode response = execute("/stock/market-status", Map.of("exchange", exchange));
+		long epochSeconds = response.path("t").asLong(0L);
+		Instant statusTimestamp = epochSeconds > 0 ? Instant.ofEpochSecond(epochSeconds) : clock.instant();
+		JsonNode sessionNode = response.path("session");
+		String session = sessionNode.isMissingNode() || sessionNode.isNull() ? null : sessionNode.asText(null);
+		String timezone = response.path("timezone").asText("America/New_York");
+
+		return new MarketStatusSnapshot(
+				response.path("exchange").asText(exchange),
+				response.path("isOpen").asBoolean(false),
+				session,
+				timezone,
+				statusTimestamp
 		);
 	}
 

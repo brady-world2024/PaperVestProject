@@ -115,7 +115,11 @@ public class PortfolioQueryService {
 				unrealizedPnl,
 				MoneyUtils.percent(unrealizedPnl, costBasis),
 				dailyChange,
-				quote != null && quote.stale()
+				quote != null && quote.stale(),
+				quote == null ? null : quote.quoteTimestamp(),
+				quote == null ? null : quote.marketSession(),
+				quote != null && quote.tradingEnabled(),
+				quote == null ? null : quote.marketTimezone()
 		);
 	}
 }
