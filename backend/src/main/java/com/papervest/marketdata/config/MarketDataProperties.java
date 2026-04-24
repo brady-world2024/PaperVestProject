@@ -22,7 +22,8 @@ public record MarketDataProperties(
 		@NotNull @Valid FinnhubProperties finnhub
 ) {
 	public enum ProviderType {
-		FINNHUB
+		FINNHUB,
+		STATIC
 	}
 
 	public record HomeSymbol(

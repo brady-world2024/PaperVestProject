@@ -29,7 +29,10 @@ export default function WatchlistPage() {
   });
 
   const removeMutation = useMutation({
-    mutationFn: async (symbol: string) => webApi.removeWatchlistItem(symbol),
+    mutationFn: async (symbol: string) => {
+      await webApi.initializeCsrf();
+      return webApi.removeWatchlistItem(symbol);
+    },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.watchlist });
     },

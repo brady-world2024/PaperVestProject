@@ -1,9 +1,12 @@
 package com.papervest.marketdata.service;
 
 import com.papervest.marketdata.config.MarketDataProperties;
+import com.papervest.marketdata.model.MarketSessionState;
+import com.papervest.marketdata.model.MarketStatusSnapshot;
 import com.papervest.marketdata.model.StockHistoryRange;
 import com.papervest.marketdata.model.StockPriceBar;
 import com.papervest.marketdata.model.StockPriceHistory;
+import com.papervest.marketdata.model.StockQuote;
 import com.papervest.marketdata.provider.MarketDataProvider;
 import com.papervest.marketdata.provider.MarketDataProviderRouter;
 import org.junit.jupiter.api.BeforeEach;
@@ -76,5 +79,66 @@ class MarketDataServiceTest {
 		assertThat(first).isEqualTo(response);
 		assertThat(second).isEqualTo(response);
 		verify(provider, times(1)).fetchPriceHistory("AAPL", StockHistoryRange.ONE_MONTH);
+	}
+
+	@Test
+	void quoteRequestsAreEnrichedWithOpenSessionContext() {
+		when(provider.fetchQuote("AAPL")).thenReturn(baseQuote());
+		when(provider.fetchMarketStatus("US")).thenReturn(new MarketStatusSnapshot(
+				"US",
+				true,
+				"regular",
+				"America/New_York",
+				Instant.parse("2026-01-15T15:00:00Z")
+		));
+
+		StockQuote quote = marketDataService.getQuote("AAPL", "Apple Inc.");
+
+		assertThat(quote.marketSession()).isEqualTo(MarketSessionState.OPEN);
+		assertThat(quote.tradingEnabled()).isTrue();
+		assertThat(quote.marketTimezone()).isEqualTo("America/New_York");
+		verify(provider, times(1)).fetchQuote("AAPL");
+		verify(provider, times(1)).fetchMarketStatus("US");
+	}
+
+	@Test
+	void quoteRequestsClassifyAfterHoursWhenMarketStatusIsPostMarket() {
+		when(provider.fetchQuote("AAPL")).thenReturn(baseQuote(Instant.parse("2026-01-15T22:30:00Z")));
+		when(provider.fetchMarketStatus("US")).thenReturn(new MarketStatusSnapshot(
+				"US",
+				false,
+				"post-market",
+				"America/New_York",
+				Instant.parse("2026-01-15T22:30:00Z")
+		));
+
+		StockQuote quote = marketDataService.getQuote("AAPL", "Apple Inc.");
+
+		assertThat(quote.marketSession()).isEqualTo(MarketSessionState.AFTER_HOURS);
+		assertThat(quote.tradingEnabled()).isFalse();
+		verify(provider, times(1)).fetchMarketStatus("US");
+	}
+
+	private StockQuote baseQuote() {
+		return baseQuote(Instant.parse("2026-01-15T15:00:00Z"));
+	}
+
+	private StockQuote baseQuote(Instant timestamp) {
+		return new StockQuote(
+				"AAPL",
+				"Apple Inc.",
+				new BigDecimal("198.2200"),
+				new BigDecimal("1.5200"),
+				new BigDecimal("0.77"),
+				new BigDecimal("197.1000"),
+				new BigDecimal("199.0000"),
+				new BigDecimal("196.4000"),
+				new BigDecimal("196.7000"),
+				timestamp,
+				false,
+				MarketSessionState.CLOSED,
+				false,
+				"America/New_York"
+		);
 	}
 }

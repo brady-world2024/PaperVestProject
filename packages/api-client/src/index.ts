@@ -45,11 +45,33 @@ export function createPapervestApiClient({
 }: ApiClientOptions) {
   let authHandlers: ApiAuthHandlers | null = null;
   let refreshPromise: Promise<string | null> | null = null;
+  let latestCookieCsrfToken: string | null = null;
 
   const rawClient = createClient(baseUrl, timeoutMs, authTransport);
   const apiClient = createClient(baseUrl, timeoutMs, authTransport);
 
+  const attachCookieCsrfHeader = (config: RequestConfig) => {
+    if (authTransport !== 'cookie') {
+      return config;
+    }
+
+    const existingHeader = getHeader(config, 'X-XSRF-TOKEN');
+    if (existingHeader) {
+      return config;
+    }
+
+    const csrfToken = resolveCookieCsrfToken();
+    if (csrfToken) {
+      setHeader(config, 'X-XSRF-TOKEN', csrfToken);
+    }
+
+    return config;
+  };
+
+  rawClient.interceptors.request.use((config) => attachCookieCsrfHeader(config as RequestConfig));
+
   apiClient.interceptors.request.use((config) => {
+    attachCookieCsrfHeader(config as RequestConfig);
     const token = authTransport === 'bearer' ? authHandlers?.getAccessToken?.() : null;
     if (token && authTransport === 'bearer') {
       config.headers.Authorization = `Bearer ${token}`;
@@ -115,18 +137,27 @@ export function createPapervestApiClient({
       return null;
     },
     async login(payload: LoginPayload) {
+      const previousCookieToken = resolveCookieCsrfToken();
       const { data } = await rawClient.post<AuthResponse>('/auth/login', payload);
+      await stabilizeCookieCsrfToken(previousCookieToken);
       return data;
     },
     async register(payload: RegisterPayload) {
+      const previousCookieToken = resolveCookieCsrfToken();
       const { data } = await rawClient.post<AuthResponse>('/auth/register', payload);
+      await stabilizeCookieCsrfToken(previousCookieToken);
       return data;
     },
     async logout(refreshToken?: string) {
-      await rawClient.post('/auth/logout', refreshToken ? { refreshToken } : {});
+      const previousCookieToken = resolveCookieCsrfToken();
+      await ensureCookieCsrfToken();
+      await rawClient.post('/auth/logout', refreshToken ? { refreshToken } : {}, buildCookieWriteConfig());
+      await stabilizeCookieCsrfToken(previousCookieToken);
     },
     async refreshAuth(payload: RefreshTokenPayload = {}) {
+      const previousCookieToken = resolveCookieCsrfToken();
       const { data } = await rawClient.post<AuthResponse>('/auth/refresh', payload);
+      await stabilizeCookieCsrfToken(previousCookieToken);
       return data;
     },
     async getSession() {
@@ -134,7 +165,11 @@ export function createPapervestApiClient({
       return data;
     },
     async initializeCsrf() {
+      const previousCookieToken = resolveCookieCsrfToken();
       await rawClient.get('/auth/csrf');
+      if (authTransport === 'cookie') {
+        latestCookieCsrfToken = await waitForCookieCsrfToken(previousCookieToken);
+      }
     },
     async getHomeMarket() {
       const { data } = await apiClient.get<HomeMarketResponse>('/market/home');
@@ -161,14 +196,20 @@ export function createPapervestApiClient({
       return data;
     },
     async addWatchlistItem(symbol: string, companyName?: string) {
+      const previousCookieToken = resolveCookieCsrfToken();
+      await ensureCookieCsrfToken();
       const { data } = await apiClient.post<WatchlistItem>('/watchlist', {
         symbol,
         companyName,
-      });
+      }, buildCookieWriteConfig());
+      await stabilizeCookieCsrfToken(previousCookieToken);
       return data;
     },
     async removeWatchlistItem(symbol: string) {
-      await apiClient.delete(`/watchlist/${symbol}`);
+      const previousCookieToken = resolveCookieCsrfToken();
+      await ensureCookieCsrfToken();
+      await apiClient.delete(`/watchlist/${symbol}`, buildCookieWriteConfig());
+      await stabilizeCookieCsrfToken(previousCookieToken);
     },
     async getPortfolio() {
       const { data } = await apiClient.get<PortfolioResponse>('/portfolio');
@@ -179,7 +220,14 @@ export function createPapervestApiClient({
       return data;
     },
     async createConditionalOrder(payload: CreateConditionalOrderPayload) {
-      const { data } = await apiClient.post<ConditionalOrderResponse>('/conditional-orders', payload);
+      const previousCookieToken = resolveCookieCsrfToken();
+      await ensureCookieCsrfToken();
+      const { data } = await apiClient.post<ConditionalOrderResponse>(
+        '/conditional-orders',
+        payload,
+        buildCookieWriteConfig()
+      );
+      await stabilizeCookieCsrfToken(previousCookieToken);
       return data;
     },
     async getConditionalOrders() {
@@ -191,26 +239,167 @@ export function createPapervestApiClient({
       return data;
     },
     async cancelConditionalOrder(orderId: string) {
-      const { data } = await apiClient.post<ConditionalOrderResponse>(`/conditional-orders/${orderId}/cancel`);
+      const previousCookieToken = resolveCookieCsrfToken();
+      await ensureCookieCsrfToken();
+      const { data } = await apiClient.post<ConditionalOrderResponse>(
+        `/conditional-orders/${orderId}/cancel`,
+        {},
+        buildCookieWriteConfig()
+      );
+      await stabilizeCookieCsrfToken(previousCookieToken);
       return data;
     },
     async buyStock(payload: TradeOrderPayload, idempotencyKey: string) {
-      const { data } = await apiClient.post<TradeExecutionResponse>('/trades/buy', payload, {
-        headers: {
+      const previousCookieToken = resolveCookieCsrfToken();
+      await ensureCookieCsrfToken();
+      const { data } = await apiClient.post<TradeExecutionResponse>(
+        '/trades/buy',
+        payload,
+        buildCookieWriteConfig({
           'X-Idempotency-Key': idempotencyKey,
-        },
-      });
+        })
+      );
+      await stabilizeCookieCsrfToken(previousCookieToken);
       return data;
     },
     async sellStock(payload: TradeOrderPayload, idempotencyKey: string) {
-      const { data } = await apiClient.post<TradeExecutionResponse>('/trades/sell', payload, {
-        headers: {
+      const previousCookieToken = resolveCookieCsrfToken();
+      await ensureCookieCsrfToken();
+      const { data } = await apiClient.post<TradeExecutionResponse>(
+        '/trades/sell',
+        payload,
+        buildCookieWriteConfig({
           'X-Idempotency-Key': idempotencyKey,
-        },
-      });
+        })
+      );
+      await stabilizeCookieCsrfToken(previousCookieToken);
       return data;
     },
   };
+
+  function buildCookieWriteConfig(headers?: Record<string, string>) {
+    if (authTransport !== 'cookie') {
+      return headers ? { headers } : undefined;
+    }
+
+    const csrfToken = resolveCookieCsrfToken();
+    const mergedHeaders = {
+      ...(headers ?? {}),
+      ...(csrfToken ? { 'X-XSRF-TOKEN': csrfToken } : {}),
+    };
+
+    return Object.keys(mergedHeaders).length ? { headers: mergedHeaders } : undefined;
+  }
+
+  function resolveCookieCsrfToken() {
+    if (authTransport !== 'cookie') {
+      return null;
+    }
+
+    const cookieToken = readCookie('XSRF-TOKEN');
+    if (cookieToken) {
+      latestCookieCsrfToken = cookieToken;
+      return cookieToken;
+    }
+
+    return latestCookieCsrfToken;
+  }
+
+  async function stabilizeCookieCsrfToken(previousToken?: string | null) {
+    if (authTransport !== 'cookie') {
+      return;
+    }
+
+    latestCookieCsrfToken = await waitForCookieCsrfToken(previousToken);
+
+    if (readCookie('XSRF-TOKEN')) {
+      latestCookieCsrfToken = readCookie('XSRF-TOKEN');
+      return;
+    }
+
+    await rawClient.get('/auth/csrf');
+    latestCookieCsrfToken = await waitForCookieCsrfToken(null);
+  }
+
+  async function ensureCookieCsrfToken() {
+    if (authTransport !== 'cookie') {
+      return null;
+    }
+
+    const existingToken = resolveCookieCsrfToken();
+    if (existingToken) {
+      return existingToken;
+    }
+
+    await rawClient.get('/auth/csrf');
+    latestCookieCsrfToken = await waitForCookieCsrfToken(null);
+    return latestCookieCsrfToken;
+  }
+}
+
+function readCookie(name: string) {
+  if (typeof document === 'undefined') {
+    return null;
+  }
+
+  const target = `${name}=`;
+  const match = document.cookie
+    .split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(target));
+
+  if (!match) {
+    return null;
+  }
+
+  return decodeURIComponent(match.slice(target.length));
+}
+
+async function waitForCookieCsrfToken(previousToken?: string | null) {
+  const immediate = readCookie('XSRF-TOKEN');
+  if (immediate && (!previousToken || immediate !== previousToken)) {
+    return immediate;
+  }
+
+  let lastSeenToken = immediate ?? previousToken ?? null;
+
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    await new Promise((resolve) => window.setTimeout(resolve, 10));
+    const nextToken = readCookie('XSRF-TOKEN');
+    if (nextToken && (!previousToken || nextToken !== previousToken)) {
+      return nextToken;
+    }
+    if (nextToken) {
+      lastSeenToken = nextToken;
+    }
+  }
+
+  return lastSeenToken;
+}
+
+function getHeader(config: RequestConfig, headerName: string) {
+  const headers = config.headers as RequestConfig['headers'] & {
+    get?: (name: string) => string | undefined;
+  };
+
+  if (typeof headers?.get === 'function') {
+    return headers.get(headerName);
+  }
+
+  return headers?.[headerName as keyof typeof headers] as string | undefined;
+}
+
+function setHeader(config: RequestConfig, headerName: string, value: string) {
+  const headers = config.headers as RequestConfig['headers'] & {
+    set?: (name: string, value: string) => void;
+  };
+
+  if (typeof headers?.set === 'function') {
+    headers.set(headerName, value);
+    return;
+  }
+
+  headers[headerName as keyof typeof headers] = value as never;
 }
 
 function createClient(

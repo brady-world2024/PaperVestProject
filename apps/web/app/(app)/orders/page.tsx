@@ -1,7 +1,7 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -26,6 +26,11 @@ export default function OrdersPage() {
   const searchParams = useSearchParams();
   const symbolPrefill = searchParams.get('symbol') ?? '';
   const sidePrefill = searchParams.get('side') === 'SELL' ? 'SELL' : 'BUY';
+  const submitLockRef = useRef(false);
+  const csrfBootstrapRef = useRef<Promise<void> | null>(null);
+  const [submitLocked, setSubmitLocked] = useState(false);
+  const [csrfReady, setCsrfReady] = useState(false);
+  const [csrfBootstrapError, setCsrfBootstrapError] = useState<unknown>(null);
 
   const {
     register,
@@ -51,21 +56,46 @@ export default function OrdersPage() {
     setValue('side', sidePrefill);
   }, [setValue, sidePrefill, symbolPrefill]);
 
+  const refreshCsrfBootstrap = useCallback(async () => {
+    setCsrfReady(false);
+    setCsrfBootstrapError(null);
+
+    const bootstrapPromise = webApi
+      .initializeCsrf()
+      .then(() => {
+        setCsrfReady(true);
+        setCsrfBootstrapError(null);
+      })
+      .catch((error) => {
+        setCsrfBootstrapError(error);
+      });
+
+    csrfBootstrapRef.current = bootstrapPromise;
+    await bootstrapPromise;
+  }, []);
+
+  useEffect(() => {
+    void refreshCsrfBootstrap();
+  }, [refreshCsrfBootstrap]);
+
   const ordersQuery = useQuery({
     queryKey: queryKeys.conditionalOrders,
     queryFn: webApi.getConditionalOrders,
   });
 
   const createMutation = useMutation({
-    mutationFn: async (values: ConditionalOrderFormValues) =>
-      webApi.createConditionalOrder({
+    mutationFn: async (values: ConditionalOrderFormValues) => {
+      await csrfBootstrapRef.current;
+      return webApi.createConditionalOrder({
         symbol: values.symbol.trim().toUpperCase(),
         side: values.side,
         targetPrice: normalizeConditionalOrderNumber(values.targetPrice),
         quantity: normalizeConditionalOrderNumber(values.quantity),
-      }),
+      });
+    },
     onSuccess: async (_, values) => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.conditionalOrders });
+      await refreshCsrfBootstrap();
       reset({
         symbol: values.symbol.trim().toUpperCase(),
         side: values.side,
@@ -76,13 +106,17 @@ export default function OrdersPage() {
   });
 
   const cancelMutation = useMutation({
-    mutationFn: async (orderId: string) => webApi.cancelConditionalOrder(orderId),
+    mutationFn: async (orderId: string) => {
+      await csrfBootstrapRef.current;
+      return webApi.cancelConditionalOrder(orderId);
+    },
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.conditionalOrders }),
         queryClient.invalidateQueries({ queryKey: queryKeys.portfolio }),
         queryClient.invalidateQueries({ queryKey: queryKeys.tradeHistory }),
       ]);
+      await refreshCsrfBootstrap();
     },
   });
 
@@ -112,13 +146,34 @@ export default function OrdersPage() {
           <form
             className="pv-stack"
             onSubmit={handleSubmit(async (values) => {
-              await createMutation.mutateAsync(values);
+              if (submitLockRef.current) {
+                return;
+              }
+
+              submitLockRef.current = true;
+              setSubmitLocked(true);
+
+              try {
+                await createMutation.mutateAsync(values);
+              } finally {
+                submitLockRef.current = false;
+                setSubmitLocked(false);
+              }
             })}
           >
             {createMutation.isError ? (
               <InlineNotice
                 tone="error"
                 message={webApi.getApiErrorMessage(createMutation.error, 'Unable to create conditional order')}
+              />
+            ) : null}
+            {csrfBootstrapError ? (
+              <InlineNotice
+                tone="error"
+                message={webApi.getApiErrorMessage(
+                  csrfBootstrapError,
+                  'Unable to prepare the order form for secure submissions'
+                )}
               />
             ) : null}
             {createMutation.isSuccess ? (
@@ -162,7 +217,11 @@ export default function OrdersPage() {
               />
             </div>
 
-            <AppButton loading={createMutation.isPending} type="submit">
+            <AppButton
+              loading={createMutation.isPending || submitLocked || !csrfReady}
+              disabled={submitLocked || !csrfReady}
+              type="submit"
+            >
               Create conditional order
             </AppButton>
           </form>

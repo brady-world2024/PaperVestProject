@@ -5,6 +5,7 @@ import com.papervest.common.web.RequestIdFilter;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.Cookie;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -37,11 +38,14 @@ public class RestAccessDeniedHandler implements AccessDeniedHandler {
 			AccessDeniedException accessDeniedException
 	) throws IOException, ServletException {
 		log.warn(
-				"Access denied method={} path={} requestId={} userId={}",
+				"Access denied method={} path={} requestId={} userId={} reason={} hasXsrfHeader={} hasXsrfCookie={}",
 				request.getMethod(),
 				request.getRequestURI(),
 				MDC.get(RequestIdFilter.REQUEST_ID_KEY),
-				MDC.get(RequestIdFilter.USER_ID_KEY)
+				MDC.get(RequestIdFilter.USER_ID_KEY),
+				accessDeniedException.getMessage(),
+				request.getHeader("X-XSRF-TOKEN") != null,
+				hasCookie(request, "XSRF-TOKEN")
 		);
 		writeError(response, request, HttpStatus.FORBIDDEN, "ACCESS_DENIED", "You do not have access to this resource");
 	}
@@ -67,5 +71,20 @@ public class RestAccessDeniedHandler implements AccessDeniedHandler {
 		body.put("timestamp", Instant.now().toString());
 		body.put("fieldErrors", List.of());
 		return body;
+	}
+
+	private boolean hasCookie(HttpServletRequest request, String cookieName) {
+		Cookie[] cookies = request.getCookies();
+		if (cookies == null) {
+			return false;
+		}
+
+		for (Cookie cookie : cookies) {
+			if (cookieName.equals(cookie.getName())) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 }

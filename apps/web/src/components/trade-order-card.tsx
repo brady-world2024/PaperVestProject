@@ -1,6 +1,7 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import {
   normalizeTradeQuantity,
@@ -52,6 +53,8 @@ export function TradeOrderCard({
   getBlockingMessage,
   onSubmitQuantity,
 }: Props) {
+  const submitLockRef = useRef(false);
+  const [submitLocked, setSubmitLocked] = useState(false);
   const {
     register,
     handleSubmit,
@@ -75,6 +78,10 @@ export function TradeOrderCard({
       <form
         className="pv-stack"
         onSubmit={handleSubmit(async ({ quantity: rawQuantity }) => {
+          if (submitLockRef.current) {
+            return;
+          }
+
           const normalizedQuantity = normalizeTradeQuantity(rawQuantity);
           const nextBlockingMessage =
             externalBlockingMessage ?? getBlockingMessage?.(normalizedQuantity) ?? null;
@@ -82,8 +89,16 @@ export function TradeOrderCard({
             return;
           }
 
-          await onSubmitQuantity(normalizedQuantity);
-          reset({ quantity: '1' });
+          submitLockRef.current = true;
+          setSubmitLocked(true);
+
+          try {
+            await onSubmitQuantity(normalizedQuantity);
+            reset({ quantity: '1' });
+          } finally {
+            submitLockRef.current = false;
+            setSubmitLocked(false);
+          }
         })}
       >
         {errorMessage ? <InlineNotice tone="error" message={errorMessage} /> : null}
@@ -116,8 +131,8 @@ export function TradeOrderCard({
         <AppButton
           type="submit"
           variant={buttonVariant}
-          loading={pending}
-          disabled={Boolean(blockingMessage) || currentPrice <= 0}
+          loading={pending || submitLocked}
+          disabled={Boolean(blockingMessage) || currentPrice <= 0 || submitLocked}
         >
           {submitLabel}
         </AppButton>

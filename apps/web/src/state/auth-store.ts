@@ -86,6 +86,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
   signOut: async () => {
     try {
+      await webApi.initializeCsrf();
       await webApi.logout();
     } catch {
       // Cookie clearing is best-effort; stale UI state should still be removed locally.

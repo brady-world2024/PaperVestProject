@@ -1,0 +1,31 @@
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/papervest}
+    username: ${SPRING_DATASOURCE_USERNAME:papervest}
+    password: ${SPRING_DATASOURCE_PASSWORD:papervest}
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${SPRING_RABBITMQ_USERNAME:guest}
+    password: ${SPRING_RABBITMQ_PASSWORD:guest}
+  flyway:
+    enabled: true
+
+app:
+  security:
+    jwt-secret: ${APP_JWT_SECRET:ci-smoke-secret-key-at-least-32-characters}
+    allowed-origins:
+      - http://localhost:3000
+      - http://127.0.0.1:3000
+      - http://localhost:8081
+      - http://127.0.0.1:8081
+  market-data:
+    provider: STATIC
+    finnhub:
+      base-url: https://example.invalid
+      api-key: smoke-key
+  conditional-orders:
+    scheduler:
+      enabled: false
+    messaging:
+      listener-enabled: false

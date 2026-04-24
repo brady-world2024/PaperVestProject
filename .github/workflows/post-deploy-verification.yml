@@ -1,0 +1,39 @@
+name: Post-deploy Verification
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Production or staging base URL to verify
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      base_url:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: post-deploy-verification-${{ inputs.base_url }}
+  cancel-in-progress: true
+
+jobs:
+  remote-smoke:
+    name: Post-deploy smoke verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run post-deploy smoke verification
+        run: bash ./scripts/ci/smoke-api.sh "${{ inputs.base_url }}"

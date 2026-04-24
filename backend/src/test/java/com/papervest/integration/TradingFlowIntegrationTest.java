@@ -188,6 +188,68 @@ class TradingFlowIntegrationTest {
 	}
 
 	@Test
+	void authenticatedStockDetailEndpointReturnsSessionAwareQuote() throws Exception {
+		String accessToken = registerAndExtractAccessToken();
+
+		mockMvc.perform(get("/api/market/stocks/AAPL")
+						.header("Authorization", "Bearer " + accessToken))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.symbol").value("AAPL"))
+				.andExpect(jsonPath("$.currentPrice").value(100.0000))
+				.andExpect(jsonPath("$.marketSession").value("OPEN"))
+				.andExpect(jsonPath("$.tradingEnabled").value(true))
+				.andExpect(jsonPath("$.marketTimezone").value("America/New_York"))
+				.andExpect(jsonPath("$.quoteTimestamp").value("2026-01-02T15:00:00Z"));
+	}
+
+	@Test
+	void portfolioAndWatchlistEndpointsSurfaceSessionAwareQuoteFields() throws Exception {
+		String accessToken = registerAndExtractAccessToken();
+
+		mockMvc.perform(post("/api/watchlist")
+						.header("Authorization", "Bearer " + accessToken)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "symbol": "AAPL",
+								  "companyName": "Apple Inc."
+								}
+								"""))
+				.andExpect(status().isCreated());
+
+		mockMvc.perform(post("/api/trades/buy")
+						.header("Authorization", "Bearer " + accessToken)
+						.header("X-Idempotency-Key", "buy-session-aware")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "symbol": "AAPL",
+								  "companyName": "Apple Inc.",
+								  "quantity": 2
+								}
+								"""))
+				.andExpect(status().isOk());
+
+		mockMvc.perform(get("/api/watchlist")
+						.header("Authorization", "Bearer " + accessToken))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.items[0].symbol").value("AAPL"))
+				.andExpect(jsonPath("$.items[0].marketSession").value("OPEN"))
+				.andExpect(jsonPath("$.items[0].tradingEnabled").value(true))
+				.andExpect(jsonPath("$.items[0].marketTimezone").value("America/New_York"))
+				.andExpect(jsonPath("$.items[0].quoteTimestamp").value("2026-01-02T15:00:00Z"));
+
+		mockMvc.perform(get("/api/portfolio")
+						.header("Authorization", "Bearer " + accessToken))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.holdings[0].symbol").value("AAPL"))
+				.andExpect(jsonPath("$.holdings[0].marketSession").value("OPEN"))
+				.andExpect(jsonPath("$.holdings[0].tradingEnabled").value(true))
+				.andExpect(jsonPath("$.holdings[0].marketTimezone").value("America/New_York"))
+				.andExpect(jsonPath("$.holdings[0].quoteTimestamp").value("2026-01-02T15:00:00Z"));
+	}
+
+	@Test
 	void authenticatedTradeEndpointRejectsOrdersWhenMarketIsClosed() throws Exception {
 		String accessToken = registerAndExtractAccessToken();
 		when(marketDataService.getQuote("AAPL", "Apple Inc.")).thenReturn(closedQuote());

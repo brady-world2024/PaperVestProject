@@ -170,6 +170,14 @@ public class MarketDataService {
 		}
 	}
 
+	public void clearRuntimeCaches() {
+		quoteCache.invalidateAll();
+		historyCache.invalidateAll();
+		searchCache.invalidateAll();
+		marketStatusCache.invalidateAll();
+		log.info("Market data runtime caches cleared provider={}", activeProvider.providerType());
+	}
+
 	public String resolveCompanyName(String symbol, String companyNameHint) {
 		if (companyNameHint != null && !companyNameHint.isBlank()) {
 			return companyNameHint.trim();
