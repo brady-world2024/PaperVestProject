@@ -9,7 +9,11 @@ on:
   workflow_dispatch:
     inputs:
       staging_base_url:
-        description: Optional staging base URL for remote smoke verification
+        description: Optional staging web base URL for remote Playwright and smoke verification
+        required: false
+        type: string
+      staging_api_base_url:
+        description: Optional staging API base URL for smoke verification when it differs from the web origin
         required: false
         type: string
 
@@ -266,6 +270,7 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.staging_base_url != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    environment: staging
     needs:
       - pr-fast-lane
       - backend-real-infra-tests
@@ -323,9 +328,10 @@ jobs:
 
   remote-staging-smoke:
     name: Remote staging smoke verification
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.staging_base_url != '' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && (inputs.staging_base_url != '' || inputs.staging_api_base_url != '') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    environment: staging
     needs:
       - local-release-smoke
       - web-playwright-e2e
@@ -339,5 +345,27 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Resolve staging smoke target and mode
+        env:
+          INPUT_STAGING_BASE_URL: ${{ inputs.staging_base_url }}
+          INPUT_STAGING_API_BASE_URL: ${{ inputs.staging_api_base_url }}
+          SMOKE_TEST_EMAIL: ${{ secrets.SMOKE_TEST_EMAIL }}
+          SMOKE_TEST_PASSWORD: ${{ secrets.SMOKE_TEST_PASSWORD }}
+        run: |
+          if [[ -n "${INPUT_STAGING_API_BASE_URL}" ]]; then
+            echo "SMOKE_TARGET_URL=${INPUT_STAGING_API_BASE_URL}" >> "$GITHUB_ENV"
+          else
+            echo "SMOKE_TARGET_URL=${INPUT_STAGING_BASE_URL}" >> "$GITHUB_ENV"
+          fi
+
+          if [[ -n "${SMOKE_TEST_EMAIL}" && -n "${SMOKE_TEST_PASSWORD}" ]]; then
+            echo "SMOKE_TEST_MODE=full-login" >> "$GITHUB_ENV"
+          else
+            echo "SMOKE_TEST_MODE=full-register" >> "$GITHUB_ENV"
+          fi
+
       - name: Run remote staging smoke verification
-        run: bash ./scripts/ci/smoke-api.sh "${{ inputs.staging_base_url }}"
+        env:
+          SMOKE_TEST_EMAIL: ${{ secrets.SMOKE_TEST_EMAIL }}
+          SMOKE_TEST_PASSWORD: ${{ secrets.SMOKE_TEST_PASSWORD }}
+        run: bash ./scripts/ci/smoke-api.sh "${SMOKE_TARGET_URL}"

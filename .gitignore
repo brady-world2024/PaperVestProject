@@ -29,6 +29,7 @@ packages/*/dist
 node_modules
 
 # Private technical documents
+/docs/
 /docs/architecture-and-devops-runbook.md
 /docs/system-architecture.md
 /docs/database-design.md
@@ -48,6 +49,11 @@ skills/
 *.doc
 *.docx
 *.md
+!README.md
+*.html
 *.pdf
+PAPERVEST_LOCAL_OVERVIEW.html
+PAPERVEST_LOCAL_OVERVIEW_CN.html
+PAPERVEST_SAAS_ROADMAP.html
 
 *.log

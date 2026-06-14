@@ -3,14 +3,39 @@ name: Post-deploy Verification
 on:
   workflow_dispatch:
     inputs:
+      environment_name:
+        description: Target environment name used for GitHub environment-scoped secrets
+        required: true
+        default: production
+        type: choice
+        options:
+          - production
+          - staging
       base_url:
-        description: Production or staging base URL to verify
+        description: Production or staging web or API base URL to verify
         required: true
         type: string
+      smoke_mode:
+        description: Smoke verification mode
+        required: true
+        default: read-only-login
+        type: choice
+        options:
+          - read-only-login
+          - full-login
+          - full-register
   workflow_call:
     inputs:
+      environment_name:
+        required: false
+        default: production
+        type: string
       base_url:
         required: true
+        type: string
+      smoke_mode:
+        required: false
+        default: read-only-login
         type: string
 
 permissions:
@@ -25,6 +50,7 @@ jobs:
     name: Post-deploy smoke verification
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    environment: ${{ inputs.environment_name }}
 
     steps:
       - name: Checkout repository
@@ -35,5 +61,22 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Validate smoke credentials for login-based modes
+        env:
+          SMOKE_TEST_MODE: ${{ inputs.smoke_mode }}
+          SMOKE_TEST_EMAIL: ${{ secrets.SMOKE_TEST_EMAIL }}
+          SMOKE_TEST_PASSWORD: ${{ secrets.SMOKE_TEST_PASSWORD }}
+        run: |
+          if [[ "${SMOKE_TEST_MODE}" == *login ]]; then
+            if [[ -z "${SMOKE_TEST_EMAIL}" || -z "${SMOKE_TEST_PASSWORD}" ]]; then
+              echo "SMOKE_TEST_EMAIL and SMOKE_TEST_PASSWORD environment secrets are required for ${SMOKE_TEST_MODE}"
+              exit 1
+            fi
+          fi
+
       - name: Run post-deploy smoke verification
+        env:
+          SMOKE_TEST_MODE: ${{ inputs.smoke_mode }}
+          SMOKE_TEST_EMAIL: ${{ secrets.SMOKE_TEST_EMAIL }}
+          SMOKE_TEST_PASSWORD: ${{ secrets.SMOKE_TEST_PASSWORD }}
         run: bash ./scripts/ci/smoke-api.sh "${{ inputs.base_url }}"

@@ -19,6 +19,7 @@ fi
 TMP_DIR="$(mktemp -d)"
 COOKIE_JAR="$TMP_DIR/papervest.cookies"
 REGISTER_JSON="$TMP_DIR/register.json"
+LOGIN_JSON="$TMP_DIR/login.json"
 SESSION_JSON="$TMP_DIR/session.json"
 HOME_JSON="$TMP_DIR/home.json"
 DETAIL_JSON="$TMP_DIR/detail.json"
@@ -35,6 +36,21 @@ cleanup() {
   rm -rf "$TMP_DIR"
 }
 trap cleanup EXIT
+
+SMOKE_TEST_MODE="${SMOKE_TEST_MODE:-full-register}"
+SMOKE_TEST_EMAIL="${SMOKE_TEST_EMAIL:-}"
+SMOKE_TEST_PASSWORD="${SMOKE_TEST_PASSWORD:-}"
+SMOKE_TEST_DEVICE_NAME="${SMOKE_TEST_DEVICE_NAME:-CI Smoke}"
+
+case "$SMOKE_TEST_MODE" in
+  full-register|full-login|read-only-login)
+    ;;
+  *)
+    echo "Unsupported SMOKE_TEST_MODE: $SMOKE_TEST_MODE"
+    echo "Supported modes: full-register, full-login, read-only-login"
+    exit 1
+    ;;
+esac
 
 json_get() {
   node -e '
@@ -87,22 +103,46 @@ if [[ "$csrf_status" != "204" ]]; then
   exit 1
 fi
 
-EMAIL="smoke-$(date +%s)-$RANDOM@example.com"
-PASSWORD="Abcd1234!"
+if [[ "$SMOKE_TEST_MODE" == "full-register" ]]; then
+  EMAIL="smoke-$(date +%s)-$RANDOM@example.com"
+  PASSWORD="Abcd1234!"
 
-echo "==> Registering smoke user $EMAIL"
-register_status="$(curl -sS -o "$REGISTER_JSON" -w "%{http_code}" \
-  -c "$COOKIE_JAR" -b "$COOKIE_JAR" \
-  -H "Content-Type: application/json" \
-  -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\",\"confirmPassword\":\"$PASSWORD\",\"deviceName\":\"CI Smoke\"}" \
-  "$API_BASE/auth/register")"
-if [[ "$register_status" != "201" ]]; then
-  echo "Register failed with status $register_status"
-  cat "$REGISTER_JSON"
-  exit 1
+  echo "==> Registering smoke user $EMAIL"
+  register_status="$(curl -sS -o "$REGISTER_JSON" -w "%{http_code}" \
+    -c "$COOKIE_JAR" -b "$COOKIE_JAR" \
+    -H "Content-Type: application/json" \
+    -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\",\"confirmPassword\":\"$PASSWORD\",\"deviceName\":\"$SMOKE_TEST_DEVICE_NAME\"}" \
+    "$API_BASE/auth/register")"
+  if [[ "$register_status" != "201" ]]; then
+    echo "Register failed with status $register_status"
+    cat "$REGISTER_JSON"
+    exit 1
+  fi
+  assert_json_eq "$REGISTER_JSON" "user.email" "$EMAIL"
+  ACCESS_TOKEN="$(json_get "$REGISTER_JSON" "accessToken")"
+else
+  if [[ -z "$SMOKE_TEST_EMAIL" || -z "$SMOKE_TEST_PASSWORD" ]]; then
+    echo "SMOKE_TEST_EMAIL and SMOKE_TEST_PASSWORD are required when SMOKE_TEST_MODE=$SMOKE_TEST_MODE"
+    exit 1
+  fi
+
+  EMAIL="$SMOKE_TEST_EMAIL"
+  PASSWORD="$SMOKE_TEST_PASSWORD"
+
+  echo "==> Logging in smoke user $EMAIL"
+  login_status="$(curl -sS -o "$LOGIN_JSON" -w "%{http_code}" \
+    -c "$COOKIE_JAR" -b "$COOKIE_JAR" \
+    -H "Content-Type: application/json" \
+    -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\",\"deviceName\":\"$SMOKE_TEST_DEVICE_NAME\"}" \
+    "$API_BASE/auth/login")"
+  if [[ "$login_status" != "200" ]]; then
+    echo "Login failed with status $login_status"
+    cat "$LOGIN_JSON"
+    exit 1
+  fi
+  assert_json_eq "$LOGIN_JSON" "user.email" "$EMAIL"
+  ACCESS_TOKEN="$(json_get "$LOGIN_JSON" "accessToken")"
 fi
-assert_json_eq "$REGISTER_JSON" "user.email" "$EMAIL"
-ACCESS_TOKEN="$(json_get "$REGISTER_JSON" "accessToken")"
 
 echo "==> Verifying cookie-backed session bootstrap"
 session_status="$(curl -sS -o "$SESSION_JSON" -w "%{http_code}" -c "$COOKIE_JAR" -b "$COOKIE_JAR" "$API_BASE/auth/session")"
@@ -152,6 +192,29 @@ if [[ "$portfolio_status" != "200" ]]; then
 fi
 json_get "$PORTFOLIO_JSON" "summary.cashBalance" >/dev/null
 
+echo "==> Checking conditional order list path"
+list_orders_status="$(curl -sS -o "$LIST_ORDERS_JSON" -w "%{http_code}" -H "Authorization: Bearer $ACCESS_TOKEN" "$API_BASE/conditional-orders")"
+if [[ "$list_orders_status" != "200" ]]; then
+  echo "Conditional order list failed with status $list_orders_status"
+  cat "$LIST_ORDERS_JSON"
+  exit 1
+fi
+json_get "$LIST_ORDERS_JSON" "orders" >/dev/null
+
+echo "==> Checking trade history path"
+trades_status="$(curl -sS -o "$TRADES_JSON" -w "%{http_code}" -H "Authorization: Bearer $ACCESS_TOKEN" "$API_BASE/trades/history")"
+if [[ "$trades_status" != "200" ]]; then
+  echo "Trade history request failed with status $trades_status"
+  cat "$TRADES_JSON"
+  exit 1
+fi
+json_get "$TRADES_JSON" "trades" >/dev/null
+
+if [[ "$SMOKE_TEST_MODE" == "read-only-login" ]]; then
+  echo "Smoke verification passed for $API_BASE"
+  exit 0
+fi
+
 echo "==> Creating and cancelling a conditional order"
 create_order_status="$(curl -sS -o "$CREATE_ORDER_JSON" -w "%{http_code}" \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
@@ -165,10 +228,9 @@ if [[ "$create_order_status" != "201" ]]; then
 fi
 ORDER_ID="$(json_get "$CREATE_ORDER_JSON" "id")"
 assert_json_eq "$CREATE_ORDER_JSON" "status" "ACTIVE"
-
 list_orders_status="$(curl -sS -o "$LIST_ORDERS_JSON" -w "%{http_code}" -H "Authorization: Bearer $ACCESS_TOKEN" "$API_BASE/conditional-orders")"
 if [[ "$list_orders_status" != "200" ]]; then
-  echo "Conditional order list failed with status $list_orders_status"
+  echo "Conditional order list after create failed with status $list_orders_status"
   cat "$LIST_ORDERS_JSON"
   exit 1
 fi
@@ -195,10 +257,9 @@ buy_status="$(curl -sS -o "$BUY_JSON" -w "%{http_code}" \
 if [[ "$buy_status" == "200" ]]; then
   assert_json_eq "$BUY_JSON" "symbol" "AAPL"
   assert_json_eq "$BUY_JSON" "side" "BUY"
-
   trades_status="$(curl -sS -o "$TRADES_JSON" -w "%{http_code}" -H "Authorization: Bearer $ACCESS_TOKEN" "$API_BASE/trades/history")"
   if [[ "$trades_status" != "200" ]]; then
-    echo "Trade history request failed with status $trades_status"
+    echo "Trade history request after buy failed with status $trades_status"
     cat "$TRADES_JSON"
     exit 1
   fi
