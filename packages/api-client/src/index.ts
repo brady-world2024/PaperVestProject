@@ -1,18 +1,25 @@
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 
 import type {
+  AccountProfile,
   ApiErrorResponse,
   AuthResponse,
+  ChangePasswordPayload,
+  ConfirmEmailVerificationPayload,
   HomeMarketResponse,
   ConditionalOrderDetailResponse,
   ConditionalOrderListResponse,
   ConditionalOrderResponse,
   CreateConditionalOrderPayload,
+  DeleteAccountPayload,
+  EmailVerificationResult,
   LoginPayload,
   PortfolioResponse,
   Quote,
   RefreshTokenPayload,
+  RequestPasswordResetPayload,
   RegisterPayload,
+  ResetPasswordPayload,
   SessionResponse,
   StockHistoryRange,
   StockPriceHistory,
@@ -164,6 +171,29 @@ export function createPapervestApiClient({
       const { data } = await rawClient.get<SessionResponse>('/auth/session');
       return data;
     },
+    async requestPasswordReset(payload: RequestPasswordResetPayload) {
+      const previousCookieToken = resolveCookieCsrfToken();
+      await ensureCookieCsrfToken();
+      await rawClient.post('/auth/password-reset/request', payload, buildCookieWriteConfig());
+      await stabilizeCookieCsrfToken(previousCookieToken);
+    },
+    async resetPassword(payload: ResetPasswordPayload) {
+      const previousCookieToken = resolveCookieCsrfToken();
+      await ensureCookieCsrfToken();
+      await rawClient.post('/auth/password-reset/confirm', payload, buildCookieWriteConfig());
+      await stabilizeCookieCsrfToken(previousCookieToken);
+    },
+    async confirmEmailVerification(payload: ConfirmEmailVerificationPayload) {
+      const previousCookieToken = resolveCookieCsrfToken();
+      await ensureCookieCsrfToken();
+      const { data } = await rawClient.post<EmailVerificationResult>(
+        '/auth/email-verification/confirm',
+        payload,
+        buildCookieWriteConfig()
+      );
+      await stabilizeCookieCsrfToken(previousCookieToken);
+      return data;
+    },
     async initializeCsrf() {
       const previousCookieToken = resolveCookieCsrfToken();
       await rawClient.get('/auth/csrf');
@@ -214,6 +244,37 @@ export function createPapervestApiClient({
     async getPortfolio() {
       const { data } = await apiClient.get<PortfolioResponse>('/portfolio');
       return data;
+    },
+    async getAccountProfile() {
+      const { data } = await apiClient.get<AccountProfile>('/account');
+      return data;
+    },
+    async changePassword(payload: ChangePasswordPayload) {
+      const previousCookieToken = resolveCookieCsrfToken();
+      await ensureCookieCsrfToken();
+      const { data } = await apiClient.post<AuthResponse>(
+        '/account/change-password',
+        payload,
+        buildCookieWriteConfig()
+      );
+      await stabilizeCookieCsrfToken(previousCookieToken);
+      return data;
+    },
+    async requestEmailVerification() {
+      const previousCookieToken = resolveCookieCsrfToken();
+      await ensureCookieCsrfToken();
+      await apiClient.post('/account/email-verification', {}, buildCookieWriteConfig());
+      await stabilizeCookieCsrfToken(previousCookieToken);
+    },
+    async deleteAccount(payload: DeleteAccountPayload) {
+      const previousCookieToken = resolveCookieCsrfToken();
+      await ensureCookieCsrfToken();
+      const config = buildCookieWriteConfig();
+      await apiClient.delete('/account', {
+        ...(config?.headers ? { headers: config.headers } : {}),
+        data: payload,
+      });
+      await stabilizeCookieCsrfToken(previousCookieToken);
     },
     async getTradeHistory() {
       const { data } = await apiClient.get<TradeHistoryResponse>('/trades/history');

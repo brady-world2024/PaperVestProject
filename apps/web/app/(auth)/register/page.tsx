@@ -39,7 +39,9 @@ export default function RegisterPage() {
   return (
     <AppCard className="pv-auth-card">
       <h1 className="pv-section-title">Create account</h1>
-      <p className="pv-section-subtitle">Open a web session and start with virtual cash.</p>
+      <p className="pv-section-subtitle">
+        Open a web session, start with virtual cash, and receive an email verification link.
+      </p>
 
       <form
         className="pv-stack"

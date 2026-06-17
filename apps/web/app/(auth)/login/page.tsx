@@ -1,6 +1,7 @@
 'use client';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
+import { useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import {
   loginFormSchema,
@@ -15,6 +16,7 @@ import { webApi } from '@/lib/api';
 import { useAuthStore } from '@/state/auth-store';
 
 export default function LoginPage() {
+  const searchParams = useSearchParams();
   const completeAuth = useAuthStore((state) => state.completeAuth);
   const {
     register,
@@ -39,6 +41,18 @@ export default function LoginPage() {
     <AppCard className="pv-auth-card">
       <h1 className="pv-section-title">Log in</h1>
       <p className="pv-section-subtitle">Use your web session to open the trading workspace.</p>
+
+      {searchParams.get('passwordReset') === '1' ? (
+        <div style={{ marginTop: '20px' }}>
+          <InlineNotice tone="info" message="Password updated. Log in with your new password." />
+        </div>
+      ) : null}
+
+      {searchParams.get('accountDeleted') === '1' ? (
+        <div style={{ marginTop: '20px' }}>
+          <InlineNotice tone="info" message="Account deleted and the web session was cleared." />
+        </div>
+      ) : null}
 
       <form
         className="pv-stack"
@@ -77,6 +91,9 @@ export default function LoginPage() {
           </AppButton>
           <AppButtonLink href="/register" variant="ghost">
             Create account
+          </AppButtonLink>
+          <AppButtonLink href="/forgot-password" variant="ghost">
+            Forgot password
           </AppButtonLink>
         </div>
       </form>

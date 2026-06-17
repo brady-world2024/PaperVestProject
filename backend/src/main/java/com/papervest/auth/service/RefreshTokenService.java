@@ -87,6 +87,14 @@ public class RefreshTokenService {
 				}, () -> log.info("Refresh token revoke ignored reason=token_not_found"));
 	}
 
+	@Transactional
+	public void revokeAllForUser(UUID userId) {
+		Instant now = clock.instant();
+		refreshTokenRepository.findAllByUserIdAndRevokedAtIsNull(userId)
+				.forEach(token -> token.revoke(now));
+		log.info("All refresh tokens revoked userId={}", userId);
+	}
+
 	@Transactional(readOnly = true)
 	public UUID requireUserId(String rawToken) {
 		return requireActiveToken(rawToken).getUserId();

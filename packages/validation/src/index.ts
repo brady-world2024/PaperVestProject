@@ -25,6 +25,35 @@ export const registerFormSchema = z
     message: 'Passwords must match',
   });
 
+export const forgotPasswordFormSchema = z.object({
+  email: emailSchema,
+});
+
+export const resetPasswordFormSchema = z
+  .object({
+    password: passwordSchema,
+    confirmPassword: z.string().min(1, 'Confirm your password'),
+  })
+  .refine((values) => values.password === values.confirmPassword, {
+    path: ['confirmPassword'],
+    message: 'Passwords must match',
+  });
+
+export const changePasswordFormSchema = z
+  .object({
+    currentPassword: z.string().min(1, 'Enter your current password'),
+    newPassword: passwordSchema,
+    confirmNewPassword: z.string().min(1, 'Confirm your new password'),
+  })
+  .refine((values) => values.newPassword === values.confirmNewPassword, {
+    path: ['confirmNewPassword'],
+    message: 'Passwords must match',
+  });
+
+export const deleteAccountFormSchema = z.object({
+  currentPassword: z.string().min(1, 'Enter your current password'),
+});
+
 export const tradeFormSchema = z.object({
   quantity: z
     .string()
@@ -60,6 +89,10 @@ export const conditionalOrderFormSchema = z.object({
 
 export type LoginFormValues = z.infer<typeof loginFormSchema>;
 export type RegisterFormValues = z.infer<typeof registerFormSchema>;
+export type ForgotPasswordFormValues = z.infer<typeof forgotPasswordFormSchema>;
+export type ResetPasswordFormValues = z.infer<typeof resetPasswordFormSchema>;
+export type ChangePasswordFormValues = z.infer<typeof changePasswordFormSchema>;
+export type DeleteAccountFormValues = z.infer<typeof deleteAccountFormSchema>;
 export type TradeFormValues = z.infer<typeof tradeFormSchema>;
 export type ConditionalOrderFormValues = z.infer<typeof conditionalOrderFormSchema>;
 

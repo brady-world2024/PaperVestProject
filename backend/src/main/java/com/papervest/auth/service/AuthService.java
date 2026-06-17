@@ -2,9 +2,11 @@ package com.papervest.auth.service;
 
 import com.papervest.auth.dto.AuthResponse;
 import com.papervest.auth.dto.AuthUserResponse;
+import com.papervest.auth.dto.EmailVerificationResultResponse;
 import com.papervest.auth.dto.LoginRequest;
 import com.papervest.auth.dto.RegisterRequest;
 import com.papervest.common.config.PortfolioProperties;
+import com.papervest.common.exception.BadRequestException;
 import com.papervest.common.exception.AuthenticationException;
 import com.papervest.common.exception.ConflictException;
 import com.papervest.common.exception.ResourceNotFoundException;
@@ -31,6 +33,8 @@ public class AuthService {
 	private final RefreshTokenService refreshTokenService;
 	private final JwtService jwtService;
 	private final PortfolioProperties portfolioProperties;
+	private final EmailVerificationService emailVerificationService;
+	private final PasswordResetService passwordResetService;
 
 	public AuthService(
 			UserRepository userRepository,
@@ -38,7 +42,9 @@ public class AuthService {
 			PasswordEncoder passwordEncoder,
 			RefreshTokenService refreshTokenService,
 			JwtService jwtService,
-			PortfolioProperties portfolioProperties
+			PortfolioProperties portfolioProperties,
+			EmailVerificationService emailVerificationService,
+			PasswordResetService passwordResetService
 	) {
 		this.userRepository = userRepository;
 		this.userAccountRepository = userAccountRepository;
@@ -46,6 +52,8 @@ public class AuthService {
 		this.refreshTokenService = refreshTokenService;
 		this.jwtService = jwtService;
 		this.portfolioProperties = portfolioProperties;
+		this.emailVerificationService = emailVerificationService;
+		this.passwordResetService = passwordResetService;
 	}
 
 	@Transactional
@@ -59,6 +67,7 @@ public class AuthService {
 
 		User user = userRepository.save(new User(normalizedEmail, passwordEncoder.encode(request.password())));
 		userAccountRepository.save(new UserAccount(user.getId(), portfolioProperties.initialCash()));
+		emailVerificationService.issueForUser(user);
 		log.info(
 				"User registered userId={} email={} initialCash={} deviceName={}",
 				user.getId(),
@@ -118,6 +127,29 @@ public class AuthService {
 			log.info("Logout requested without refresh token");
 		}
 		refreshTokenService.revoke(refreshToken);
+	}
+
+	@Transactional
+	public void requestPasswordReset(String email) {
+		passwordResetService.requestReset(normalizeEmail(email));
+	}
+
+	@Transactional
+	public void resetPassword(String token, String password, String confirmPassword) {
+		if (!password.equals(confirmPassword)) {
+			throw new BadRequestException("PASSWORD_CONFIRMATION_MISMATCH", "Password confirmation does not match");
+		}
+		passwordResetService.resetPassword(token, password);
+	}
+
+	@Transactional
+	public EmailVerificationResultResponse confirmEmailVerification(String token) {
+		User user = emailVerificationService.confirm(token);
+		return new EmailVerificationResultResponse(user.getEmail(), user.getEmailVerifiedAt());
+	}
+
+	public AuthResponse issueFreshSession(User user, String deviceName) {
+		return issueSession(user, deviceName);
 	}
 
 	private AuthResponse issueSession(User user, String deviceName) {

@@ -1,7 +1,12 @@
 import type {
+  ChangePasswordPayload,
+  ConfirmEmailVerificationPayload,
   CreateConditionalOrderPayload,
+  DeleteAccountPayload,
   LoginPayload,
+  RequestPasswordResetPayload,
   RegisterPayload,
+  ResetPasswordPayload,
   StockHistoryRange,
   TradeOrderPayload,
 } from './types';
@@ -57,6 +62,34 @@ export function removeWatchlistItem(symbol: string) {
 
 export function getPortfolio() {
   return papervestApiClient.getPortfolio();
+}
+
+export function getAccountProfile() {
+  return papervestApiClient.getAccountProfile();
+}
+
+export function changePassword(payload: ChangePasswordPayload) {
+  return papervestApiClient.changePassword(payload);
+}
+
+export function requestEmailVerification() {
+  return papervestApiClient.requestEmailVerification();
+}
+
+export function requestPasswordReset(payload: RequestPasswordResetPayload) {
+  return papervestApiClient.requestPasswordReset(payload);
+}
+
+export function resetPassword(payload: ResetPasswordPayload) {
+  return papervestApiClient.resetPassword(payload);
+}
+
+export function confirmEmailVerification(payload: ConfirmEmailVerificationPayload) {
+  return papervestApiClient.confirmEmailVerification(payload);
+}
+
+export function deleteAccount(payload: DeleteAccountPayload) {
+  return papervestApiClient.deleteAccount(payload);
 }
 
 export function getTradeHistory() {

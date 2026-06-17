@@ -67,6 +67,10 @@ app:
       refresh-token-path: ${APP_AUTH_COOKIE_REFRESH_PATH:/api/auth}
   portfolio:
     initial-cash: ${APP_INITIAL_CASH:100000.00}
+  account-lifecycle:
+    web-base-url: ${APP_WEB_BASE_URL:http://localhost:3000}
+    email-verification-token-ttl: ${APP_EMAIL_VERIFICATION_TOKEN_TTL:P2D}
+    password-reset-token-ttl: ${APP_PASSWORD_RESET_TOKEN_TTL:PT1H}
   market-data:
     provider: ${MARKETDATA_PROVIDER:FINNHUB}
     request-timeout: ${MARKETDATA_REQUEST_TIMEOUT:PT4S}

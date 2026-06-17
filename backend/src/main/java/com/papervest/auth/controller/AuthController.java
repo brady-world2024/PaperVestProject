@@ -7,6 +7,10 @@ import com.papervest.auth.dto.RefreshTokenRequest;
 import com.papervest.auth.dto.RegisterRequest;
 import com.papervest.auth.dto.SessionResponse;
 import com.papervest.auth.dto.AuthUserResponse;
+import com.papervest.auth.dto.ConfirmEmailVerificationRequest;
+import com.papervest.auth.dto.EmailVerificationResultResponse;
+import com.papervest.auth.dto.RequestPasswordResetRequest;
+import com.papervest.auth.dto.ResetPasswordRequest;
 import com.papervest.auth.service.AuthCookieService;
 import com.papervest.auth.service.AuthService;
 import com.papervest.common.security.AuthenticatedUser;
@@ -89,5 +93,22 @@ public class AuthController {
 	@GetMapping("/session")
 	public SessionResponse session(@AuthenticationPrincipal AuthenticatedUser currentUser) {
 		return new SessionResponse(new AuthUserResponse(currentUser.userId(), currentUser.email()));
+	}
+
+	@PostMapping("/password-reset/request")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	public void requestPasswordReset(@Valid @RequestBody RequestPasswordResetRequest request) {
+		authService.requestPasswordReset(request.email());
+	}
+
+	@PostMapping("/password-reset/confirm")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	public void resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+		authService.resetPassword(request.token(), request.password(), request.confirmPassword());
+	}
+
+	@PostMapping("/email-verification/confirm")
+	public EmailVerificationResultResponse confirmEmailVerification(@Valid @RequestBody ConfirmEmailVerificationRequest request) {
+		return authService.confirmEmailVerification(request.token());
 	}
 }

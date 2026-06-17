@@ -1,4 +1,5 @@
 export const queryKeys = {
+  accountProfile: ['account-profile'] as const,
   home: ['home-market'] as const,
   portfolio: ['portfolio'] as const,
   stockSearch: (query: string) => ['stock-search', query] as const,

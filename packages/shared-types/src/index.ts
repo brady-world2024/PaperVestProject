@@ -83,6 +83,20 @@ export type RegisterPayload = {
   deviceName?: string;
 };
 
+export type RequestPasswordResetPayload = {
+  email: string;
+};
+
+export type ResetPasswordPayload = {
+  token: string;
+  password: string;
+  confirmPassword: string;
+};
+
+export type ConfirmEmailVerificationPayload = {
+  token: string;
+};
+
 export type LogoutPayload = {
   refreshToken?: string;
 };
@@ -194,6 +208,30 @@ export type PortfolioSummary = {
 export type PortfolioResponse = {
   summary: PortfolioSummary;
   holdings: Holding[];
+};
+
+export type AccountProfile = {
+  userId: string;
+  email: string;
+  emailVerified: boolean;
+  emailVerifiedAt: string | null;
+  createdAt: string;
+};
+
+export type ChangePasswordPayload = {
+  currentPassword: string;
+  newPassword: string;
+  confirmNewPassword: string;
+  deviceName?: string;
+};
+
+export type DeleteAccountPayload = {
+  currentPassword: string;
+};
+
+export type EmailVerificationResult = {
+  email: string;
+  emailVerifiedAt: string;
 };
 
 export type TradeSide = 'BUY' | 'SELL';

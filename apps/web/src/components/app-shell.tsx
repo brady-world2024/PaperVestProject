@@ -15,6 +15,7 @@ const navItems = [
   { href: '/watchlist', label: 'Watchlist' },
   { href: '/portfolio', label: 'Portfolio' },
   { href: '/activity', label: 'Activity' },
+  { href: '/account', label: 'Account' },
 ];
 
 const pageMeta = [
@@ -42,6 +43,11 @@ const pageMeta = [
     match: (pathname: string) => pathname.startsWith('/activity'),
     title: 'Activity',
     description: 'Executed paper trades and timestamps.',
+  },
+  {
+    match: (pathname: string) => pathname.startsWith('/account'),
+    title: 'Account',
+    description: 'Identity, password rotation, email verification, and lifecycle controls.',
   },
   {
     match: (pathname: string) => pathname.startsWith('/stocks/'),
@@ -83,7 +89,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                       ? 'Saved symbols'
                       : item.href === '/portfolio'
                         ? 'Holdings + P&L'
-                        : 'Trade ledger'}
+                        : item.href === '/activity'
+                          ? 'Trade ledger'
+                          : 'Security + lifecycle'}
                 </span>
               </Link>
             ))}
@@ -128,6 +136,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             </Link>
             <Link className="pv-shell-topbar-link" href="/portfolio">
               Portfolio
+            </Link>
+            <Link className="pv-shell-topbar-link" href="/account">
+              Account
             </Link>
           </div>
         </header>

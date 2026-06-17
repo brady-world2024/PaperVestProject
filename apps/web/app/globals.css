@@ -327,7 +327,8 @@ input {
 }
 
 .pv-dashboard-hero,
-.pv-portfolio-hero {
+.pv-portfolio-hero,
+.pv-account-hero {
   display: grid;
   grid-template-columns: 1.28fr 0.92fr;
   gap: var(--pv-space-lg);
@@ -336,13 +337,15 @@ input {
 
 .pv-dashboard-board,
 .pv-portfolio-layout,
+.pv-account-grid,
 .pv-stock-layout {
   display: grid;
   gap: var(--pv-space-lg);
 }
 
 .pv-dashboard-board,
-.pv-portfolio-layout {
+.pv-portfolio-layout,
+.pv-account-grid {
   grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.95fr);
 }
 
@@ -395,6 +398,7 @@ input {
 
 .pv-dashboard-hero-card,
 .pv-portfolio-hero-card,
+.pv-account-hero-card,
 .pv-stock-hero-card {
   display: grid;
   gap: 18px;
@@ -418,6 +422,7 @@ input {
 .pv-command-card,
 .pv-market-board-card,
 .pv-portfolio-sidecard,
+.pv-account-sidecard,
 .pv-portfolio-holdings-card {
   min-height: 100%;
 }
@@ -1068,6 +1073,30 @@ input {
   border-bottom: none;
 }
 
+.pv-account-identity {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(227, 220, 202, 0.88);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.pv-account-identity strong {
+  font-size: 1.06rem;
+  overflow-wrap: anywhere;
+}
+
+.pv-account-danger-zone {
+  display: grid;
+}
+
+.pv-account-danger-card {
+  border-color: rgba(183, 65, 14, 0.24);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 246, 242, 0.92));
+}
+
 .pv-chip {
   display: inline-flex;
   align-items: center;
@@ -1083,6 +1112,11 @@ input {
 }
 
 .pv-chip.sell {
+  background: var(--pv-color-negative-soft);
+  color: var(--pv-color-negative);
+}
+
+.pv-chip.danger {
   background: var(--pv-color-negative-soft);
   color: var(--pv-color-negative);
 }
