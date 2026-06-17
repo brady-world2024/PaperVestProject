@@ -91,16 +91,27 @@ class PostgresIntegrationTest extends AbstractContainerIntegrationTest {
 					where schemaname = 'public'
 					  and tablename = 'password_reset_tokens'
 					  and indexname = 'ix_password_reset_tokens_user_id'
+				""",
+				Integer.class
+		);
+		Integer portfolioSnapshotIndexes = jdbcTemplate.queryForObject(
+				"""
+					select count(*)
+					from pg_indexes
+					where schemaname = 'public'
+					  and tablename = 'portfolio_snapshots'
+					  and indexname = 'ix_portfolio_snapshots_user_id_created_at'
 					""",
 				Integer.class
 		);
 
-		assertThat(appliedMigrations).isEqualTo(3);
+		assertThat(appliedMigrations).isEqualTo(4);
 		assertThat(metadataColumnType).isEqualTo("jsonb");
 		assertThat(executionKeyIndexes).isEqualTo(1);
 		assertThat(schedulerIndexes).isEqualTo(1);
 		assertThat(emailTokenIndexes).isEqualTo(1);
 		assertThat(passwordResetTokenIndexes).isEqualTo(1);
+		assertThat(portfolioSnapshotIndexes).isEqualTo(1);
 	}
 
 	@Test

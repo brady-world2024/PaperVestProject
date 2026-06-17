@@ -14,6 +14,8 @@ import type {
   DeleteAccountPayload,
   EmailVerificationResult,
   LoginPayload,
+  PortfolioHistoryRange,
+  PortfolioHistoryResponse,
   PortfolioResponse,
   Quote,
   RefreshTokenPayload,
@@ -243,6 +245,12 @@ export function createPapervestApiClient({
     },
     async getPortfolio() {
       const { data } = await apiClient.get<PortfolioResponse>('/portfolio');
+      return data;
+    },
+    async getPortfolioHistory(range: PortfolioHistoryRange) {
+      const { data } = await apiClient.get<PortfolioHistoryResponse>('/portfolio/history', {
+        params: { range },
+      });
       return data;
     },
     async getAccountProfile() {

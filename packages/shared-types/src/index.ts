@@ -210,6 +210,27 @@ export type PortfolioResponse = {
   holdings: Holding[];
 };
 
+export type PortfolioHistoryRange = '1W' | '1M' | '3M' | 'ALL';
+
+export type PortfolioSnapshotSource = 'TRADE_EXECUTION';
+
+export type PortfolioHistoryPoint = {
+  timestamp: string;
+  totalPortfolioValue: number;
+  cashBalance: number;
+  holdingsMarketValue: number;
+  realizedPnl: number;
+  unrealizedPnl: number;
+  snapshotSource: PortfolioSnapshotSource;
+};
+
+export type PortfolioHistoryResponse = {
+  range: PortfolioHistoryRange;
+  from: string | null;
+  to: string;
+  points: PortfolioHistoryPoint[];
+};
+
 export type AccountProfile = {
   userId: string;
   email: string;

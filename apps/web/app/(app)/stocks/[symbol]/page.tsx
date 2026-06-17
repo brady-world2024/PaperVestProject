@@ -59,6 +59,7 @@ export default function StockDetailPage() {
   const refreshTradeQueries = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: queryKeys.portfolio }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.portfolioHistoryRoot }),
       queryClient.invalidateQueries({ queryKey: queryKeys.home }),
       queryClient.invalidateQueries({ queryKey: queryKeys.watchlist }),
       queryClient.invalidateQueries({ queryKey: queryKeys.tradeHistory }),

@@ -7,6 +7,7 @@ import com.papervest.common.util.MoneyUtils;
 import com.papervest.common.util.SymbolUtils;
 import com.papervest.marketdata.model.StockQuote;
 import com.papervest.marketdata.service.MarketDataService;
+import com.papervest.portfolio.service.PortfolioHistoryService;
 import com.papervest.portfolio.model.UserAccount;
 import com.papervest.portfolio.repository.UserAccountRepository;
 import com.papervest.trading.dto.TradeExecutionResponse;
@@ -25,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -36,6 +38,7 @@ public class TradeService {
 	private final HoldingRepository holdingRepository;
 	private final TradeRepository tradeRepository;
 	private final MarketDataService marketDataService;
+	private final PortfolioHistoryService portfolioHistoryService;
 	private final TransactionTemplate transactionTemplate;
 
 	public TradeService(
@@ -43,12 +46,14 @@ public class TradeService {
 			HoldingRepository holdingRepository,
 			TradeRepository tradeRepository,
 			MarketDataService marketDataService,
+			PortfolioHistoryService portfolioHistoryService,
 			PlatformTransactionManager transactionManager
 	) {
 		this.userAccountRepository = userAccountRepository;
 		this.holdingRepository = holdingRepository;
 		this.tradeRepository = tradeRepository;
 		this.marketDataService = marketDataService;
+		this.portfolioHistoryService = portfolioHistoryService;
 		this.transactionTemplate = new TransactionTemplate(transactionManager);
 	}
 
@@ -293,8 +298,23 @@ public class TradeService {
 				realizedPnl,
 				account.getCashBalance()
 		);
+		recordPortfolioSnapshotBestEffort(userId, trade.getExecutedAt());
 
 		return toResponse(trade, false);
+	}
+
+	private void recordPortfolioSnapshotBestEffort(UUID userId, Instant capturedAt) {
+		try {
+			portfolioHistoryService.recordTradeExecutionSnapshot(userId, capturedAt);
+		}
+		catch (RuntimeException ex) {
+			log.warn(
+					"Portfolio snapshot recording skipped userId={} capturedAt={} reason={}",
+					userId,
+					capturedAt,
+					ex.getMessage()
+			);
+		}
 	}
 
 	private TradeExecutionResponse toResponse(Trade trade, boolean idempotentReplay) {

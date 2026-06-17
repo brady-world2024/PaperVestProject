@@ -168,6 +168,16 @@ class TradingFlowIntegrationTest {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.trades.length()").value(2));
 
+		mockMvc.perform(get("/api/portfolio/history")
+						.header("Authorization", "Bearer " + accessToken)
+						.param("range", "ALL"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.range").value("ALL"))
+				.andExpect(jsonPath("$.points.length()").value(2))
+				.andExpect(jsonPath("$.points[0].snapshotSource").value("TRADE_EXECUTION"))
+				.andExpect(jsonPath("$.points[0].cashBalance").value(99000.00))
+				.andExpect(jsonPath("$.points[1].cashBalance").value(99400.00));
+
 		mockMvc.perform(delete("/api/watchlist/AAPL")
 						.header("Authorization", "Bearer " + accessToken))
 				.andExpect(status().isNoContent());

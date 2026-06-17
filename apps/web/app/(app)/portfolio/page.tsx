@@ -1,14 +1,16 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getMarketSessionPresentation } from '@papervest/shared-types';
+import { getMarketSessionPresentation, type PortfolioHistoryRange } from '@papervest/shared-types';
 
 import { AppButtonLink } from '@/components/app-button';
 import { AppCard } from '@/components/app-card';
 import { EmptyState } from '@/components/empty-state';
 import { InlineNotice } from '@/components/inline-notice';
 import { MetricCard } from '@/components/metric-card';
+import { PortfolioHistoryChart } from '@/components/portfolio-history-chart';
 import { SectionHeader } from '@/components/section-header';
 import { liveQuoteRefreshOptions } from '@/lib/market-data-refresh';
 import { getMarketSessionChipClass } from '@/lib/market-session';
@@ -24,6 +26,7 @@ import {
 } from '@/lib/formatters';
 
 export default function PortfolioPage() {
+  const [historyRange, setHistoryRange] = useState<PortfolioHistoryRange>('1M');
   const portfolioQuery = useQuery({
     queryKey: queryKeys.portfolio,
     queryFn: webApi.getPortfolio,
@@ -35,9 +38,18 @@ export default function PortfolioPage() {
     queryFn: webApi.getTradeHistory,
   });
 
+  const portfolioHistoryQuery = useQuery({
+    queryKey: queryKeys.portfolioHistory(historyRange),
+    queryFn: () => webApi.getPortfolioHistory(historyRange),
+    placeholderData: (previousData) => previousData,
+  });
+
   const summary = portfolioQuery.data?.summary;
   const holdings = portfolioQuery.data?.holdings ?? [];
   const recentTrades = historyQuery.data?.trades.slice(0, 5) ?? [];
+  const portfolioHistoryErrorMessage = portfolioHistoryQuery.isError
+    ? webApi.getApiErrorMessage(portfolioHistoryQuery.error, 'Unable to load portfolio history right now')
+    : null;
 
   return (
     <main className="pv-page pv-stack">
@@ -102,6 +114,17 @@ export default function PortfolioPage() {
           </div>
         </AppCard>
       </section>
+
+      <AppCard className="pv-chart-card">
+        <PortfolioHistoryChart
+          range={historyRange}
+          history={portfolioHistoryQuery.data}
+          loading={portfolioHistoryQuery.isLoading}
+          refreshing={portfolioHistoryQuery.isFetching && Boolean(portfolioHistoryQuery.data?.points.length)}
+          errorMessage={portfolioHistoryErrorMessage}
+          onSelectRange={setHistoryRange}
+        />
+      </AppCard>
 
       <section className="pv-portfolio-layout">
         <AppCard className="pv-portfolio-holdings-card">

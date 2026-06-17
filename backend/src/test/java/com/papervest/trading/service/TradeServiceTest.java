@@ -4,6 +4,7 @@ import com.papervest.common.exception.InvalidTradeException;
 import com.papervest.marketdata.model.MarketSessionState;
 import com.papervest.marketdata.model.StockQuote;
 import com.papervest.marketdata.service.MarketDataService;
+import com.papervest.portfolio.service.PortfolioHistoryService;
 import com.papervest.portfolio.model.UserAccount;
 import com.papervest.portfolio.repository.UserAccountRepository;
 import com.papervest.trading.dto.TradeExecutionResponse;
@@ -31,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -55,6 +57,9 @@ class TradeServiceTest {
 	private PlatformTransactionManager transactionManager;
 
 	@Mock
+	private PortfolioHistoryService portfolioHistoryService;
+
+	@Mock
 	private TransactionStatus transactionStatus;
 
 	private TradeService tradeService;
@@ -67,6 +72,7 @@ class TradeServiceTest {
 				holdingRepository,
 				tradeRepository,
 				marketDataService,
+				portfolioHistoryService,
 				transactionManager
 		);
 	}
@@ -93,6 +99,7 @@ class TradeServiceTest {
 		assertThat(holdingCaptor.getValue().getQuantity()).isEqualByComparingTo("10.0000");
 		assertThat(response.grossAmount()).isEqualByComparingTo("1000.00");
 		assertThat(response.side().name()).isEqualTo("BUY");
+		verify(portfolioHistoryService).recordTradeExecutionSnapshot(eq(userId), any());
 	}
 
 	@Test

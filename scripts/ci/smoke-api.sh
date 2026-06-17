@@ -25,6 +25,7 @@ HOME_JSON="$TMP_DIR/home.json"
 DETAIL_JSON="$TMP_DIR/detail.json"
 HISTORY_JSON="$TMP_DIR/history.json"
 PORTFOLIO_JSON="$TMP_DIR/portfolio.json"
+PORTFOLIO_HISTORY_JSON="$TMP_DIR/portfolio-history.json"
 CREATE_ORDER_JSON="$TMP_DIR/create-order.json"
 LIST_ORDERS_JSON="$TMP_DIR/list-orders.json"
 CANCEL_ORDER_JSON="$TMP_DIR/cancel-order.json"
@@ -233,6 +234,16 @@ if [[ "$portfolio_status" != "200" ]]; then
   exit 1
 fi
 json_get "$PORTFOLIO_JSON" "summary.cashBalance" >/dev/null
+
+echo "==> Checking portfolio history path"
+portfolio_history_status="$(curl -sS -o "$PORTFOLIO_HISTORY_JSON" -w "%{http_code}" -H "Authorization: Bearer $ACCESS_TOKEN" "$API_BASE/portfolio/history?range=ALL")"
+if [[ "$portfolio_history_status" != "200" ]]; then
+  echo "Portfolio history request failed with status $portfolio_history_status"
+  cat "$PORTFOLIO_HISTORY_JSON"
+  exit 1
+fi
+assert_json_eq "$PORTFOLIO_HISTORY_JSON" "range" "ALL"
+json_get "$PORTFOLIO_HISTORY_JSON" "points" >/dev/null
 
 echo "==> Checking conditional order list path"
 list_orders_status="$(curl -sS -o "$LIST_ORDERS_JSON" -w "%{http_code}" -H "Authorization: Bearer $ACCESS_TOKEN" "$API_BASE/conditional-orders")"
