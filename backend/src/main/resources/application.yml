@@ -42,10 +42,19 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: ${MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE:health,info,metrics}
   endpoint:
     health:
-      show-details: never
+      probes:
+        enabled: ${MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED:true}
+        add-additional-paths: ${MANAGEMENT_ENDPOINT_HEALTH_PROBES_ADDITIONAL_PATHS:true}
+      show-details: ${MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS:never}
+      show-components: ${MANAGEMENT_ENDPOINT_HEALTH_SHOW_COMPONENTS:never}
+      group:
+        liveness:
+          include: livenessState,ping
+        readiness:
+          include: readinessState,db,diskSpace,ping,marketDataConfiguration,conditionalOrdersRuntime
 
 logging:
   level:

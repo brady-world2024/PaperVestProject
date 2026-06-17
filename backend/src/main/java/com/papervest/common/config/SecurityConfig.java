@@ -72,6 +72,8 @@ public class SecurityConfig {
 				)
 				.authorizeHttpRequests(authorize -> authorize
 						.requestMatchers("/actuator/health").permitAll()
+						.requestMatchers("/actuator/health/**").permitAll()
+						.requestMatchers("/livez", "/readyz").permitAll()
 						.requestMatchers("/api/test-support/**").permitAll()
 						.requestMatchers(
 								HttpMethod.POST,

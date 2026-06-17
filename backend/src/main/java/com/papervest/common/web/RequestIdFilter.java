@@ -99,7 +99,11 @@ public class RequestIdFilter extends OncePerRequestFilter {
 	}
 
 	private boolean isHealthProbe(HttpServletRequest request) {
-		return "/actuator/health".equals(request.getRequestURI());
+		String requestUri = request.getRequestURI();
+		return "/actuator/health".equals(requestUri)
+				|| requestUri.startsWith("/actuator/health/")
+				|| "/livez".equals(requestUri)
+				|| "/readyz".equals(requestUri);
 	}
 
 	private void clearLoggingContext() {

@@ -31,6 +31,10 @@ CANCEL_ORDER_JSON="$TMP_DIR/cancel-order.json"
 BUY_JSON="$TMP_DIR/buy.json"
 TRADES_JSON="$TMP_DIR/trades.json"
 HEALTH_JSON="$TMP_DIR/health.json"
+READINESS_JSON="$TMP_DIR/readiness.json"
+LIVENESS_JSON="$TMP_DIR/liveness.json"
+INFO_JSON="$TMP_DIR/info.json"
+METRICS_JSON="$TMP_DIR/metrics.json"
 
 cleanup() {
   rm -rf "$TMP_DIR"
@@ -96,6 +100,24 @@ if [[ "$health_status" != "200" ]]; then
 fi
 assert_json_eq "$HEALTH_JSON" "status" "UP"
 
+echo "==> Checking actuator liveness at $ROOT_BASE/actuator/health/liveness"
+liveness_status="$(curl -sS -o "$LIVENESS_JSON" -w "%{http_code}" "$ROOT_BASE/actuator/health/liveness")"
+if [[ "$liveness_status" != "200" ]]; then
+  echo "Liveness check failed with status $liveness_status"
+  cat "$LIVENESS_JSON"
+  exit 1
+fi
+assert_json_eq "$LIVENESS_JSON" "status" "UP"
+
+echo "==> Checking actuator readiness at $ROOT_BASE/actuator/health/readiness"
+readiness_status="$(curl -sS -o "$READINESS_JSON" -w "%{http_code}" "$ROOT_BASE/actuator/health/readiness")"
+if [[ "$readiness_status" != "200" ]]; then
+  echo "Readiness check failed with status $readiness_status"
+  cat "$READINESS_JSON"
+  exit 1
+fi
+assert_json_eq "$READINESS_JSON" "status" "UP"
+
 echo "==> Bootstrapping CSRF cookie"
 csrf_status="$(curl -sS -o /dev/null -w "%{http_code}" -c "$COOKIE_JAR" -b "$COOKIE_JAR" "$API_BASE/auth/csrf")"
 if [[ "$csrf_status" != "204" ]]; then
@@ -152,6 +174,26 @@ if [[ "$session_status" != "200" ]]; then
   exit 1
 fi
 assert_json_eq "$SESSION_JSON" "user.email" "$EMAIL"
+
+echo "==> Checking authenticated actuator info payload"
+info_status="$(curl -sS -o "$INFO_JSON" -w "%{http_code}" -H "Authorization: Bearer $ACCESS_TOKEN" "$ROOT_BASE/actuator/info")"
+if [[ "$info_status" != "200" ]]; then
+  echo "Actuator info request failed with status $info_status"
+  cat "$INFO_JSON"
+  exit 1
+fi
+assert_json_eq "$INFO_JSON" "application.name" "PaperVest API"
+json_get "$INFO_JSON" "marketData.provider" >/dev/null
+json_get "$INFO_JSON" "conditionalOrders.schedulerEnabled" >/dev/null
+
+echo "==> Checking authenticated actuator metrics exposure"
+metrics_status="$(curl -sS -o "$METRICS_JSON" -w "%{http_code}" -H "Authorization: Bearer $ACCESS_TOKEN" "$ROOT_BASE/actuator/metrics")"
+if [[ "$metrics_status" != "200" ]]; then
+  echo "Actuator metrics request failed with status $metrics_status"
+  cat "$METRICS_JSON"
+  exit 1
+fi
+json_get "$METRICS_JSON" "names[0]" >/dev/null
 
 echo "==> Checking market home payload"
 home_status="$(curl -sS -o "$HOME_JSON" -w "%{http_code}" -H "Authorization: Bearer $ACCESS_TOKEN" "$API_BASE/market/home")"
