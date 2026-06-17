@@ -17,7 +17,8 @@ public record AppSecurityProperties(
 		Duration accessTokenTtl,
 		Duration refreshTokenTtl,
 		@NotEmpty List<String> allowedOrigins,
-		@Valid AuthCookieProperties authCookie
+		@Valid AuthCookieProperties authCookie,
+		@Valid AuthRateLimitProperties authRateLimit
 ) {
 
 	public record AuthCookieProperties(
@@ -29,6 +30,17 @@ public record AppSecurityProperties(
 			String sameSite,
 			@NotBlank String accessTokenPath,
 			@NotBlank String refreshTokenPath
+	) {
+	}
+
+	public record AuthRateLimitProperties(
+			boolean enabled,
+			Duration window,
+			int loginMaxAttempts,
+			int registerMaxAttempts,
+			int passwordResetRequestMaxAttempts,
+			int passwordResetConfirmMaxAttempts,
+			int emailVerificationConfirmMaxAttempts
 	) {
 	}
 }

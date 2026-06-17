@@ -7,16 +7,20 @@ import com.papervest.common.exception.BadRequestException;
 import com.papervest.common.util.TokenHashingUtils;
 import com.papervest.user.model.User;
 import com.papervest.user.repository.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Locale;
 
 @Service
 public class PasswordResetService {
 
+	private static final Logger log = LoggerFactory.getLogger(PasswordResetService.class);
 	private final PasswordResetTokenRepository tokenRepository;
 	private final UserRepository userRepository;
 	private final AccountLifecycleProperties properties;
@@ -52,8 +56,18 @@ public class PasswordResetService {
 			return;
 		}
 
-		userRepository.findByEmail(email.trim().toLowerCase())
-				.ifPresent(this::issueResetForUser);
+		String normalizedEmail = email.trim().toLowerCase(Locale.US);
+		boolean issued = userRepository.findByEmail(normalizedEmail)
+				.map(user -> {
+					issueResetForUser(user);
+					return true;
+				})
+				.orElse(false);
+		log.info(
+				"Password reset requested email={} issued={}",
+				maskEmail(normalizedEmail),
+				issued
+		);
 	}
 
 	@Transactional
@@ -65,6 +79,11 @@ public class PasswordResetService {
 		token.consume(clock.instant());
 		user.changePasswordHash(passwordEncoder.encode(nextPassword));
 		refreshTokenService.revokeAllForUser(user.getId());
+		log.info(
+				"Password reset completed userId={} email={}",
+				user.getId(),
+				maskEmail(user.getEmail())
+		);
 	}
 
 	private void issueResetForUser(User user) {
@@ -98,5 +117,16 @@ public class PasswordResetService {
 		}
 
 		return token;
+	}
+
+	private String maskEmail(String email) {
+		if (email == null || email.isBlank()) {
+			return "unknown";
+		}
+		int atIndex = email.indexOf('@');
+		if (atIndex <= 1) {
+			return "***";
+		}
+		return email.charAt(0) + "***" + email.substring(atIndex);
 	}
 }

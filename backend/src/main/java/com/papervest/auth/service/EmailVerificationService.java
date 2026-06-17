@@ -8,6 +8,8 @@ import com.papervest.common.exception.ResourceNotFoundException;
 import com.papervest.common.util.TokenHashingUtils;
 import com.papervest.user.model.User;
 import com.papervest.user.repository.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +20,7 @@ import java.util.UUID;
 @Service
 public class EmailVerificationService {
 
+	private static final Logger log = LoggerFactory.getLogger(EmailVerificationService.class);
 	private final EmailVerificationTokenRepository tokenRepository;
 	private final UserRepository userRepository;
 	private final AccountLifecycleProperties properties;
@@ -68,6 +71,11 @@ public class EmailVerificationService {
 
 		token.consume(clock.instant());
 		user.markEmailVerified(clock.instant());
+		log.info(
+				"Email verification confirmed userId={} email={}",
+				user.getId(),
+				maskEmail(user.getEmail())
+		);
 		return user;
 	}
 
@@ -95,5 +103,16 @@ public class EmailVerificationService {
 		User user = userRepository.findById(userId)
 				.orElseThrow(() -> new ResourceNotFoundException("USER_NOT_FOUND", "User account could not be found"));
 		issueForUser(user);
+	}
+
+	private String maskEmail(String email) {
+		if (email == null || email.isBlank()) {
+			return "unknown";
+		}
+		int atIndex = email.indexOf('@');
+		if (atIndex <= 1) {
+			return "***";
+		}
+		return email.charAt(0) + "***" + email.substring(atIndex);
 	}
 }

@@ -2,6 +2,7 @@ package com.papervest.common.config;
 
 import com.papervest.common.security.CsrfCookieFilter;
 import com.papervest.common.security.JwtAuthenticationFilter;
+import com.papervest.common.security.AuthRateLimitFilter;
 import com.papervest.common.security.RestAccessDeniedHandler;
 import com.papervest.common.security.RestAuthenticationEntryPoint;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,6 +22,8 @@ import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.security.web.csrf.CsrfTokenRequestHandler;
 import org.springframework.security.web.csrf.XorCsrfTokenRequestAttributeHandler;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
+import org.springframework.security.web.header.writers.StaticHeadersWriter;
 import org.springframework.util.StringUtils;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -38,6 +41,7 @@ public class SecurityConfig {
 			HttpSecurity http,
 			JwtAuthenticationFilter jwtAuthenticationFilter,
 			CsrfCookieFilter csrfCookieFilter,
+			AuthRateLimitFilter authRateLimitFilter,
 			RestAuthenticationEntryPoint authenticationEntryPoint,
 			RestAccessDeniedHandler accessDeniedHandler
 	) throws Exception {
@@ -50,6 +54,17 @@ public class SecurityConfig {
 						.requireCsrfProtectionMatcher(this::requiresCsrfProtection)
 				)
 				.cors(Customizer.withDefaults())
+				.headers(headers -> headers
+						.contentSecurityPolicy(csp -> csp.policyDirectives(
+								"default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+						))
+						.referrerPolicy(referrer -> referrer.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER))
+						.frameOptions(frame -> frame.deny())
+						.addHeaderWriter(new StaticHeadersWriter(
+								"Permissions-Policy",
+								"camera=(), geolocation=(), microphone=(), payment=()"
+						))
+				)
 				.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 				.exceptionHandling(exceptions -> exceptions
 						.authenticationEntryPoint(authenticationEntryPoint)
@@ -73,6 +88,7 @@ public class SecurityConfig {
 						.anyRequest().authenticated()
 				)
 				.addFilterAfter(csrfCookieFilter, CsrfFilter.class)
+				.addFilterBefore(authRateLimitFilter, UsernamePasswordAuthenticationFilter.class)
 				.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
 				.build();
 	}

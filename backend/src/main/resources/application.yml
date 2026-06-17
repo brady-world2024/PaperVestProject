@@ -65,6 +65,14 @@ app:
       same-site: ${APP_AUTH_COOKIE_SAME_SITE:Lax}
       access-token-path: ${APP_AUTH_COOKIE_ACCESS_PATH:/api}
       refresh-token-path: ${APP_AUTH_COOKIE_REFRESH_PATH:/api/auth}
+    auth-rate-limit:
+      enabled: ${APP_AUTH_RATE_LIMIT_ENABLED:true}
+      window: ${APP_AUTH_RATE_LIMIT_WINDOW:PT10M}
+      login-max-attempts: ${APP_AUTH_RATE_LIMIT_LOGIN_MAX_ATTEMPTS:10}
+      register-max-attempts: ${APP_AUTH_RATE_LIMIT_REGISTER_MAX_ATTEMPTS:5}
+      password-reset-request-max-attempts: ${APP_AUTH_RATE_LIMIT_PASSWORD_RESET_REQUEST_MAX_ATTEMPTS:5}
+      password-reset-confirm-max-attempts: ${APP_AUTH_RATE_LIMIT_PASSWORD_RESET_CONFIRM_MAX_ATTEMPTS:10}
+      email-verification-confirm-max-attempts: ${APP_AUTH_RATE_LIMIT_EMAIL_VERIFICATION_CONFIRM_MAX_ATTEMPTS:10}
   portfolio:
     initial-cash: ${APP_INITIAL_CASH:100000.00}
   account-lifecycle:

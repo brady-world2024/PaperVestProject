@@ -11,6 +11,8 @@ import com.papervest.common.exception.BadRequestException;
 import com.papervest.common.exception.ResourceNotFoundException;
 import com.papervest.user.model.User;
 import com.papervest.user.repository.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +22,7 @@ import java.util.UUID;
 @Service
 public class AccountService {
 
+	private static final Logger log = LoggerFactory.getLogger(AccountService.class);
 	private final UserRepository userRepository;
 	private final PasswordEncoder passwordEncoder;
 	private final RefreshTokenService refreshTokenService;
@@ -65,6 +68,12 @@ public class AccountService {
 
 		user.changePasswordHash(passwordEncoder.encode(request.newPassword()));
 		refreshTokenService.revokeAllForUser(userId);
+		log.info(
+				"Password changed userId={} email={} deviceName={}",
+				user.getId(),
+				maskEmail(user.getEmail()),
+				normalizeDeviceName(request.deviceName())
+		);
 		return authService.issueFreshSession(user, request.deviceName());
 	}
 
@@ -79,11 +88,35 @@ public class AccountService {
 		if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
 			throw new AuthenticationException("Current password is incorrect");
 		}
+		log.warn(
+				"Account deleted userId={} email={}",
+				user.getId(),
+				maskEmail(user.getEmail())
+		);
 		userRepository.delete(user);
 	}
 
 	private User requireUser(UUID userId) {
 		return userRepository.findById(userId)
 				.orElseThrow(() -> new ResourceNotFoundException("USER_NOT_FOUND", "User account could not be found"));
+	}
+
+	private String normalizeDeviceName(String deviceName) {
+		if (deviceName == null || deviceName.isBlank()) {
+			return "unspecified";
+		}
+		String trimmed = deviceName.trim();
+		return trimmed.length() > 80 ? trimmed.substring(0, 80) : trimmed;
+	}
+
+	private String maskEmail(String email) {
+		if (email == null || email.isBlank()) {
+			return "unknown";
+		}
+		int atIndex = email.indexOf('@');
+		if (atIndex <= 1) {
+			return "***";
+		}
+		return email.charAt(0) + "***" + email.substring(atIndex);
 	}
 }
