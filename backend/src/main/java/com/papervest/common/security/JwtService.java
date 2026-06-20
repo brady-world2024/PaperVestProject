@@ -2,6 +2,7 @@ package com.papervest.common.security;
 
 import com.papervest.common.config.AppSecurityProperties;
 import com.papervest.common.exception.AuthenticationException;
+import com.papervest.user.model.UserRole;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
@@ -31,7 +32,7 @@ public class JwtService {
 		this.clock = clock;
 	}
 
-	public AccessToken createAccessToken(UUID userId, String email) {
+	public AccessToken createAccessToken(UUID userId, String email, UserRole role) {
 		Instant issuedAt = clock.instant();
 		Instant expiresAt = issuedAt.plus(properties.accessTokenTtl());
 
@@ -41,6 +42,7 @@ public class JwtService {
 				.issuedAt(issuedAt)
 				.expiresAt(expiresAt)
 				.claim("email", email)
+				.claim("role", role == null ? UserRole.USER.name() : role.name())
 				.build();
 
 		JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
@@ -52,7 +54,11 @@ public class JwtService {
 	public AuthenticatedUser parseAccessToken(String token) {
 		try {
 			Jwt jwt = jwtDecoder.decode(token);
-			return new AuthenticatedUser(UUID.fromString(jwt.getSubject()), jwt.getClaimAsString("email"));
+			String roleClaim = jwt.getClaimAsString("role");
+			UserRole role = roleClaim == null || roleClaim.isBlank()
+					? UserRole.USER
+					: UserRole.valueOf(roleClaim);
+			return new AuthenticatedUser(UUID.fromString(jwt.getSubject()), jwt.getClaimAsString("email"), role);
 		}
 		catch (JwtException | IllegalArgumentException ex) {
 			throw new AuthenticationException("Invalid or expired access token");

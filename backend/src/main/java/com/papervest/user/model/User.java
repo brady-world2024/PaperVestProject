@@ -2,6 +2,8 @@ package com.papervest.user.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
@@ -23,6 +25,10 @@ public class User {
 	@Column(name = "password_hash", nullable = false)
 	private String passwordHash;
 
+	@Enumerated(EnumType.STRING)
+	@Column(nullable = false, length = 16)
+	private UserRole role;
+
 	@Column(name = "created_at", nullable = false)
 	private Instant createdAt;
 
@@ -36,9 +42,14 @@ public class User {
 	}
 
 	public User(String email, String passwordHash) {
+		this(email, passwordHash, UserRole.USER);
+	}
+
+	public User(String email, String passwordHash, UserRole role) {
 		this.id = UUID.randomUUID();
 		this.email = email;
 		this.passwordHash = passwordHash;
+		this.role = role == null ? UserRole.USER : role;
 	}
 
 	@PrePersist
@@ -72,6 +83,10 @@ public class User {
 		return createdAt;
 	}
 
+	public UserRole getRole() {
+		return role;
+	}
+
 	public Instant getEmailVerifiedAt() {
 		return emailVerifiedAt;
 	}
@@ -88,5 +103,9 @@ public class User {
 		if (emailVerifiedAt == null) {
 			emailVerifiedAt = verifiedAt;
 		}
+	}
+
+	public void changeRole(UserRole nextRole) {
+		role = nextRole == null ? UserRole.USER : nextRole;
 	}
 }

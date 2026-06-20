@@ -88,6 +88,8 @@ app:
     web-base-url: ${APP_WEB_BASE_URL:http://localhost:3000}
     email-verification-token-ttl: ${APP_EMAIL_VERIFICATION_TOKEN_TTL:P2D}
     password-reset-token-ttl: ${APP_PASSWORD_RESET_TOKEN_TTL:PT1H}
+  admin:
+    bootstrap-emails: ${APP_BOOTSTRAP_ADMIN_EMAILS:}
   market-data:
     provider: ${MARKETDATA_PROVIDER:FINNHUB}
     request-timeout: ${MARKETDATA_REQUEST_TIMEOUT:PT4S}

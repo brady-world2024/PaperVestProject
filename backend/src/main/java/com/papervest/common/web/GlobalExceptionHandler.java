@@ -9,6 +9,8 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -101,6 +103,26 @@ public class GlobalExceptionHandler {
 			);
 		}
 		return buildResponse(ex.status(), ex.code(), ex.getMessage(), List.of(), request);
+	}
+
+	@ExceptionHandler({AccessDeniedException.class, AuthorizationDeniedException.class})
+	public ResponseEntity<ApiErrorResponse> handleAccessDenied(Exception ex, HttpServletRequest request) {
+		log.warn(
+				"Access denied method={} path={} requestId={} userId={} type={} message={}",
+				request.getMethod(),
+				request.getRequestURI(),
+				MDC.get(RequestIdFilter.REQUEST_ID_KEY),
+				MDC.get(RequestIdFilter.USER_ID_KEY),
+				ex.getClass().getName(),
+				ex.getMessage()
+		);
+		return buildResponse(
+				HttpStatus.FORBIDDEN,
+				"ACCESS_DENIED",
+				"You do not have access to this resource",
+				List.of(),
+				request
+		);
 	}
 
 	@ExceptionHandler(Exception.class)

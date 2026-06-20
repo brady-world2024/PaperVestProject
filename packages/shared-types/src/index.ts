@@ -52,9 +52,12 @@ export type ApiErrorResponse = {
   fieldErrors?: ApiFieldError[];
 };
 
+export type UserRole = 'USER' | 'ADMIN';
+
 export type AuthUser = {
   id: string;
   email: string;
+  role: UserRole;
 };
 
 export type AuthResponse = {
@@ -261,9 +264,66 @@ export type NotificationListResponse = {
 export type AccountProfile = {
   userId: string;
   email: string;
+  role: UserRole;
   emailVerified: boolean;
   emailVerifiedAt: string | null;
   createdAt: string;
+};
+
+export type SupportUserSummary = {
+  userId: string;
+  email: string;
+  role: UserRole;
+  emailVerified: boolean;
+  createdAt: string;
+  cashBalance: number;
+  realizedPnl: number;
+  holdingsCount: number;
+  watchlistCount: number;
+  activeConditionalOrdersCount: number;
+  activeSessionsCount: number;
+  unreadNotificationsCount: number;
+  lastTradeAt: string | null;
+};
+
+export type SupportUserListResponse = {
+  users: SupportUserSummary[];
+};
+
+export type SupportUserProfile = {
+  userId: string;
+  email: string;
+  role: UserRole;
+  emailVerified: boolean;
+  emailVerifiedAt: string | null;
+  createdAt: string;
+};
+
+export type SupportAccountSummary = {
+  initialCash: number;
+  cashBalance: number;
+  realizedPnl: number;
+};
+
+export type SupportHolding = {
+  symbol: string;
+  companyName: string;
+  quantity: number;
+  averageCost: number;
+};
+
+export type SupportWatchlistItem = {
+  symbol: string;
+  companyName: string;
+  addedAt: string;
+};
+
+export type SupportSession = {
+  sessionId: string;
+  deviceName: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+  expiresAt: string;
 };
 
 export type ChangePasswordPayload = {
@@ -378,4 +438,20 @@ export type ConditionalOrderListResponse = {
 export type ConditionalOrderDetailResponse = {
   order: ConditionalOrder;
   events: ConditionalOrderStatusEvent[];
+};
+
+export type SupportUserDetailResponse = {
+  user: SupportUserProfile;
+  account: SupportAccountSummary;
+  holdingsCount: number;
+  watchlistCount: number;
+  activeConditionalOrdersCount: number;
+  activeSessionsCount: number;
+  unreadNotificationsCount: number;
+  holdings: SupportHolding[];
+  watchlist: SupportWatchlistItem[];
+  activeSessions: SupportSession[];
+  recentTrades: TradeExecutionResponse[];
+  activeConditionalOrders: ConditionalOrder[];
+  recentNotifications: UserNotification[];
 };

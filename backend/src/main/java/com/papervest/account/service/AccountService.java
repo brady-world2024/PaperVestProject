@@ -53,6 +53,7 @@ public class AccountService {
 		return new AccountProfileResponse(
 				user.getId(),
 				user.getEmail(),
+				user.getRole(),
 				user.isEmailVerified(),
 				user.getEmailVerifiedAt(),
 				user.getCreatedAt()

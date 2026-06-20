@@ -19,6 +19,7 @@ const navItems = [
   { href: '/portfolio', label: 'Portfolio', meta: 'Holdings + P&L' },
   { href: '/activity', label: 'Activity', meta: 'Trade ledger' },
   { href: '/account', label: 'Account', meta: 'Security + lifecycle' },
+  { href: '/admin/support', label: 'Support', meta: 'Admin support console', adminOnly: true },
 ];
 
 const pageMeta = [
@@ -58,6 +59,11 @@ const pageMeta = [
     description: 'Identity, password rotation, email verification, and lifecycle controls.',
   },
   {
+    match: (pathname: string) => pathname.startsWith('/admin/support'),
+    title: 'Support Console',
+    description: 'Admin-only user lookup for account state, sessions, orders, notifications, and recent trading context.',
+  },
+  {
     match: (pathname: string) => pathname.startsWith('/stocks/'),
     title: 'Stock Detail',
     description: 'Quote, history, position context, and trade entry.',
@@ -77,6 +83,15 @@ export function AppShell({ children }: { children: ReactNode }) {
     refetchInterval: 30000,
   });
   const unreadNotifications = notificationsQuery.data?.unreadCount ?? 0;
+  const visibleNavItems = navItems.filter((item) => !item.adminOnly || user?.role === 'ADMIN');
+  const topbarLinks = [
+    { href: '/dashboard', label: 'Search market' },
+    { href: '/notifications', label: 'Notifications' },
+    { href: '/orders', label: 'Conditional orders' },
+    { href: '/portfolio', label: 'Portfolio' },
+    { href: '/account', label: 'Account' },
+    ...(user?.role === 'ADMIN' ? [{ href: '/admin/support', label: 'Support console' }] : []),
+  ];
 
   return (
     <div className="pv-app-shell">
@@ -87,7 +102,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Link>
 
           <nav className="pv-shell-nav" aria-label="Primary">
-            {navItems.map((item) => (
+            {visibleNavItems.map((item) => (
               <Link
                 key={item.href}
                 className="pv-shell-nav-link"
@@ -108,7 +123,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           <section className="pv-shell-sidecard">
             <span className="pv-eyebrow">Signed in</span>
             <div className="pv-shell-user-email">{user?.email}</div>
-            <p className="pv-kicker">Backend-managed web session.</p>
+            <p className="pv-kicker">
+              {user?.role === 'ADMIN' ? 'Admin session with support access.' : 'Backend-managed web session.'}
+            </p>
             <AppButton
               variant="ghost"
               className="pv-shell-signout"
@@ -136,21 +153,11 @@ export function AppShell({ children }: { children: ReactNode }) {
             </p>
           </div>
           <div className="pv-shell-topbar-actions">
-            <Link className="pv-shell-topbar-link" href="/dashboard">
-              Search market
-            </Link>
-            <Link className="pv-shell-topbar-link" href="/notifications">
-              Notifications
-            </Link>
-            <Link className="pv-shell-topbar-link" href="/orders">
-              Conditional orders
-            </Link>
-            <Link className="pv-shell-topbar-link" href="/portfolio">
-              Portfolio
-            </Link>
-            <Link className="pv-shell-topbar-link" href="/account">
-              Account
-            </Link>
+            {topbarLinks.map((link) => (
+              <Link key={link.href} className="pv-shell-topbar-link" href={link.href}>
+                {link.label}
+              </Link>
+            ))}
           </div>
         </header>
 

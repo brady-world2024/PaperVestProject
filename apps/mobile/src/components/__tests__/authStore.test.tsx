@@ -5,6 +5,7 @@ import {
   loadStoredSession,
   saveStoredSession,
 } from '../../services/storage/authStorage';
+import type { AuthResponse } from '@papervest/shared-types';
 
 jest.mock('../../services/api/papervestApi', () => ({
   refreshAuth: jest.fn(),
@@ -21,13 +22,14 @@ const mockedLoadStoredSession = jest.mocked(loadStoredSession);
 const mockedSaveStoredSession = jest.mocked(saveStoredSession);
 const mockedClearStoredSession = jest.mocked(clearStoredSession);
 
-const demoSession = {
+const demoSession: AuthResponse = {
   accessToken: 'access-token',
   refreshToken: 'refresh-token',
   accessTokenExpiresAt: '2026-01-15T16:00:00Z',
   user: {
     id: 'user-1',
     email: 'alice@example.com',
+    role: 'USER',
   },
 };
 

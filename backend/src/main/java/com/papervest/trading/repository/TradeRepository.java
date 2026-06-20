@@ -11,6 +11,10 @@ public interface TradeRepository extends JpaRepository<Trade, UUID> {
 
 	List<Trade> findTop200ByUserIdOrderByExecutedAtDesc(UUID userId);
 
+	List<Trade> findTop10ByUserIdOrderByExecutedAtDesc(UUID userId);
+
+	Optional<Trade> findTop1ByUserIdOrderByExecutedAtDesc(UUID userId);
+
 	Optional<Trade> findByUserIdAndIdempotencyKey(UUID userId, String idempotencyKey);
 
 	Optional<Trade> findByExecutionKey(String executionKey);

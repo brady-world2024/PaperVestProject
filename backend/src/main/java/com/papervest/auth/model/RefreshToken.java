@@ -60,6 +60,10 @@ public class RefreshToken {
 		return userId;
 	}
 
+	public UUID getId() {
+		return id;
+	}
+
 	public String getDeviceName() {
 		return deviceName;
 	}
@@ -70,6 +74,14 @@ public class RefreshToken {
 
 	public Instant getRevokedAt() {
 		return revokedAt;
+	}
+
+	public Instant getLastUsedAt() {
+		return lastUsedAt;
+	}
+
+	public Instant getCreatedAt() {
+		return createdAt;
 	}
 
 	public void markUsed(Instant usedAt) {

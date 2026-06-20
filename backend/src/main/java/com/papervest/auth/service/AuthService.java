@@ -5,6 +5,7 @@ import com.papervest.auth.dto.AuthUserResponse;
 import com.papervest.auth.dto.EmailVerificationResultResponse;
 import com.papervest.auth.dto.LoginRequest;
 import com.papervest.auth.dto.RegisterRequest;
+import com.papervest.admin.service.AdminBootstrapService;
 import com.papervest.common.config.PortfolioProperties;
 import com.papervest.common.exception.BadRequestException;
 import com.papervest.common.exception.AuthenticationException;
@@ -35,6 +36,7 @@ public class AuthService {
 	private final PortfolioProperties portfolioProperties;
 	private final EmailVerificationService emailVerificationService;
 	private final PasswordResetService passwordResetService;
+	private final AdminBootstrapService adminBootstrapService;
 
 	public AuthService(
 			UserRepository userRepository,
@@ -44,7 +46,8 @@ public class AuthService {
 			JwtService jwtService,
 			PortfolioProperties portfolioProperties,
 			EmailVerificationService emailVerificationService,
-			PasswordResetService passwordResetService
+			PasswordResetService passwordResetService,
+			AdminBootstrapService adminBootstrapService
 	) {
 		this.userRepository = userRepository;
 		this.userAccountRepository = userAccountRepository;
@@ -54,6 +57,7 @@ public class AuthService {
 		this.portfolioProperties = portfolioProperties;
 		this.emailVerificationService = emailVerificationService;
 		this.passwordResetService = passwordResetService;
+		this.adminBootstrapService = adminBootstrapService;
 	}
 
 	@Transactional
@@ -65,7 +69,11 @@ public class AuthService {
 			throw new ConflictException("EMAIL_ALREADY_REGISTERED", "An account already exists for that email address");
 		}
 
-		User user = userRepository.save(new User(normalizedEmail, passwordEncoder.encode(request.password())));
+		User user = userRepository.save(new User(
+				normalizedEmail,
+				passwordEncoder.encode(request.password()),
+				adminBootstrapService.initialRoleForEmail(normalizedEmail)
+		));
 		userAccountRepository.save(new UserAccount(user.getId(), portfolioProperties.initialCash()));
 		emailVerificationService.issueForUser(user);
 		log.info(
@@ -158,12 +166,12 @@ public class AuthService {
 	}
 
 	private AuthResponse buildAuthResponse(User user, RefreshTokenService.IssuedRefreshToken issuedRefreshToken) {
-		JwtService.AccessToken accessToken = jwtService.createAccessToken(user.getId(), user.getEmail());
+		JwtService.AccessToken accessToken = jwtService.createAccessToken(user.getId(), user.getEmail(), user.getRole());
 		return new AuthResponse(
 				accessToken.tokenValue(),
 				issuedRefreshToken.rawToken(),
 				accessToken.expiresAt(),
-				new AuthUserResponse(user.getId(), user.getEmail())
+				new AuthUserResponse(user.getId(), user.getEmail(), user.getRole())
 		);
 	}
 

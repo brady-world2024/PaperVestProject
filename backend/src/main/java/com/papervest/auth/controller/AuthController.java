@@ -92,7 +92,7 @@ public class AuthController {
 
 	@GetMapping("/session")
 	public SessionResponse session(@AuthenticationPrincipal AuthenticatedUser currentUser) {
-		return new SessionResponse(new AuthUserResponse(currentUser.userId(), currentUser.email()));
+		return new SessionResponse(new AuthUserResponse(currentUser.userId(), currentUser.email(), currentUser.role()));
 	}
 
 	@PostMapping("/password-reset/request")

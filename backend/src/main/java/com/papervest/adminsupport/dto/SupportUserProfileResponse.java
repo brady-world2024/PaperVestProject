@@ -1,12 +1,11 @@
-package com.papervest.account.dto;
+package com.papervest.adminsupport.dto;
 
 import com.papervest.user.model.UserRole;
 
 import java.time.Instant;
-import java.util.UUID;
 
-public record AccountProfileResponse(
-		UUID userId,
+public record SupportUserProfileResponse(
+		String userId,
 		String email,
 		UserRole role,
 		boolean emailVerified,

@@ -2,6 +2,8 @@ import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'ax
 
 import type {
   AccountProfile,
+  SupportUserDetailResponse,
+  SupportUserListResponse,
   ApiErrorResponse,
   AuthResponse,
   ChangePasswordPayload,
@@ -277,6 +279,16 @@ export function createPapervestApiClient({
     },
     async getAccountProfile() {
       const { data } = await apiClient.get<AccountProfile>('/account');
+      return data;
+    },
+    async getSupportUsers(query?: string) {
+      const { data } = await apiClient.get<SupportUserListResponse>('/admin/support/users', {
+        params: query ? { query } : undefined,
+      });
+      return data;
+    },
+    async getSupportUserDetail(userId: string) {
+      const { data } = await apiClient.get<SupportUserDetailResponse>(`/admin/support/users/${userId}`);
       return data;
     },
     async changePassword(payload: ChangePasswordPayload) {
