@@ -7,6 +7,19 @@ export type E2ECredentials = {
   password: string;
 };
 
+export type ApiAuthSession = {
+  accessToken: string;
+  user: {
+    id: string;
+    email: string;
+    role: string;
+  };
+};
+
+export function getApiBaseUrl() {
+  return apiBaseUrl;
+}
+
 export function generateE2eCredentials(): E2ECredentials {
   return {
     email: `e2e-${Date.now()}-${Math.floor(Math.random() * 10_000)}@example.com`,
@@ -41,6 +54,62 @@ export async function loginThroughUi(page: Page, credentials: E2ECredentials) {
 
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+}
+
+export async function registerUserByApi(
+  request: APIRequestContext,
+  credentials: E2ECredentials
+) {
+  const response = await request.post(`${apiBaseUrl}/auth/register`, {
+    data: {
+      email: credentials.email,
+      password: credentials.password,
+      confirmPassword: credentials.password,
+      deviceName: 'PaperVest Web',
+    },
+  });
+
+  expect(response.status(), 'expected API registration to succeed').toBe(201);
+  return (await response.json()) as ApiAuthSession;
+}
+
+export async function loginUserByApi(
+  request: APIRequestContext,
+  credentials: E2ECredentials
+) {
+  const response = await request.post(`${apiBaseUrl}/auth/login`, {
+    data: {
+      email: credentials.email,
+      password: credentials.password,
+      deviceName: 'PaperVest Web',
+    },
+  });
+
+  return response;
+}
+
+export async function ensureUserSessionByApi(
+  request: APIRequestContext,
+  credentials: E2ECredentials
+) {
+  const loginResponse = await loginUserByApi(request, credentials);
+  if (loginResponse.status() === 200) {
+    return (await loginResponse.json()) as ApiAuthSession;
+  }
+
+  expect(loginResponse.status(), 'expected missing user login to fail before fallback register').toBe(401);
+  return registerUserByApi(request, credentials);
+}
+
+export function getAdminE2eCredentialsFromEnv(): E2ECredentials | null {
+  const email = process.env.PLAYWRIGHT_ADMIN_EMAIL?.trim();
+  const password = process.env.PLAYWRIGHT_ADMIN_PASSWORD?.trim();
+
+  if (!email || !password) {
+    return null;
+  }
+
+  return { email, password };
 }
 
 export async function signOutThroughUi(page: Page) {

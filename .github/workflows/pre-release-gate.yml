@@ -222,7 +222,7 @@ jobs:
 
       - name: Start backend with CI smoke profile
         run: |
-          SPRING_PROFILES_ACTIVE=ci-smoke ./backend/mvnw -f backend/pom.xml -q spring-boot:run > backend-pre-release-e2e.log 2>&1 &
+          APP_BOOTSTRAP_ADMIN_EMAILS=admin@example.com SPRING_PROFILES_ACTIVE=ci-smoke ./backend/mvnw -f backend/pom.xml -q spring-boot:run > backend-pre-release-e2e.log 2>&1 &
           echo $! > backend-pre-release-e2e.pid
 
       - name: Wait for backend health endpoint
@@ -240,6 +240,8 @@ jobs:
       - name: Run Playwright web flows
         env:
           PLAYWRIGHT_API_BASE_URL: http://127.0.0.1:8080/api
+          PLAYWRIGHT_ADMIN_EMAIL: admin@example.com
+          PLAYWRIGHT_ADMIN_PASSWORD: SecurePass1
         run: pnpm --filter @papervest/web e2e
 
       - name: Upload Playwright report

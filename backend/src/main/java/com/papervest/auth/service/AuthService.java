@@ -107,6 +107,7 @@ public class AuthService {
 				maskEmail(user.getEmail()),
 				normalizeDeviceName(request.deviceName())
 		);
+		adminBootstrapService.ensureBootstrapRole(user);
 		return issueSession(user, request.deviceName());
 	}
 
@@ -120,6 +121,7 @@ public class AuthService {
 		RefreshTokenService.IssuedRefreshToken issuedRefreshToken = refreshTokenService.rotate(refreshToken, deviceName);
 		User user = userRepository.findById(issuedRefreshToken.userId())
 				.orElseThrow(() -> new ResourceNotFoundException("USER_NOT_FOUND", "User account could not be found"));
+		adminBootstrapService.ensureBootstrapRole(user);
 		log.info(
 				"Session refreshed userId={} email={} deviceName={}",
 				user.getId(),

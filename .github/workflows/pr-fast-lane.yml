@@ -68,7 +68,7 @@ jobs:
       - name: Run backend integration tests
         run: >
           ./backend/mvnw -f backend/pom.xml -q
-          -Dtest=RequestCorrelationIntegrationTest,WebCookieAuthIntegrationTest,TradingFlowIntegrationTest,ConditionalOrderFlowIntegrationTest,JsonLoggingProfileSmokeTest
+          -Dtest=RequestCorrelationIntegrationTest,WebCookieAuthIntegrationTest,TradingFlowIntegrationTest,ConditionalOrderFlowIntegrationTest,AdminBootstrapLoginIntegrationTest,AccountLifecycleIntegrationTest,NotificationFlowIntegrationTest,SecurityHardeningIntegrationTest,AdminSupportIntegrationTest,JsonLoggingProfileSmokeTest
           test
 
   web-typecheck:

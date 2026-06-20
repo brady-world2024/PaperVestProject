@@ -28,6 +28,18 @@ public class AdminBootstrapService {
 		return adminProperties.isBootstrapAdminEmail(normalizedEmail) ? UserRole.ADMIN : UserRole.USER;
 	}
 
+	@Transactional
+	public User ensureBootstrapRole(User user) {
+		if (user == null) {
+			return null;
+		}
+		if (!adminProperties.isBootstrapAdminEmail(user.getEmail())) {
+			return user;
+		}
+		promoteIfNeeded(user);
+		return user;
+	}
+
 	@EventListener(ApplicationReadyEvent.class)
 	@Transactional
 	public void reconcileBootstrapAdmins() {
