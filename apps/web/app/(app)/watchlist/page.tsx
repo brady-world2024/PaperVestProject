@@ -8,6 +8,7 @@ import { AppCard } from '@/components/app-card';
 import { EmptyState } from '@/components/empty-state';
 import { InlineNotice } from '@/components/inline-notice';
 import { SectionHeader } from '@/components/section-header';
+import { getStaleQuoteBadge, getStaleQuoteMessage } from '@/lib/market-data-freshness';
 import { liveQuoteRefreshOptions } from '@/lib/market-data-refresh';
 import { getMarketSessionChipClass } from '@/lib/market-session';
 import { queryKeys } from '@/lib/query-keys';
@@ -98,6 +99,9 @@ export default function WatchlistPage() {
                           <span className={`pv-chip ${getMarketSessionChipClass(item.marketSession ?? 'CLOSED')}`}>
                             {marketSession.statusLabel}
                           </span>
+                          {getStaleQuoteBadge(item.staleQuote) ? (
+                            <span className="pv-chip neutral">{getStaleQuoteBadge(item.staleQuote)}</span>
+                          ) : null}
                         </span>
                         <span className="pv-list-company">{item.companyName}</span>
                         {item.quoteTimestamp ? (
@@ -108,6 +112,9 @@ export default function WatchlistPage() {
                         ) : (
                           <span className="pv-kicker">Saved for quick access and trade planning.</span>
                         )}
+                        {getStaleQuoteMessage(item.staleQuote) ? (
+                          <span className="pv-kicker">{getStaleQuoteMessage(item.staleQuote)}</span>
+                        ) : null}
                       </div>
                       <div className="pv-list-secondary">
                         <strong>

@@ -16,8 +16,12 @@ public record MarketDataProperties(
 		@NotNull ProviderType provider,
 		@NotNull Duration requestTimeout,
 		@NotNull Duration quoteCacheTtl,
+		@NotNull Duration quoteStaleGraceTtl,
 		@NotNull Duration historyCacheTtl,
+		@NotNull Duration historyStaleGraceTtl,
 		@NotNull Duration searchCacheTtl,
+		@NotNull Duration searchStaleGraceTtl,
+		boolean allowPartialHomeResults,
 		@NotEmpty List<@Valid HomeSymbol> homeSymbols,
 		@NotNull @Valid FinnhubProperties finnhub
 ) {

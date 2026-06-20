@@ -13,6 +13,7 @@ import { InlineNotice } from '@/components/inline-notice';
 import { MetricCard } from '@/components/metric-card';
 import { QuoteRow } from '@/components/quote-row';
 import { SectionHeader } from '@/components/section-header';
+import { getDegradedHomeMarketMessage, getStaleQuoteBadge, getStaleQuoteMessage } from '@/lib/market-data-freshness';
 import { liveQuoteRefreshOptions } from '@/lib/market-data-refresh';
 import { queryKeys } from '@/lib/query-keys';
 import { webApi } from '@/lib/api';
@@ -63,6 +64,7 @@ export default function DashboardPage() {
   const holdings = portfolioQuery.data?.holdings ?? [];
   const watchlistItems = watchlistQuery.data?.items ?? [];
   const recentTrades = historyQuery.data?.trades.slice(0, 4) ?? [];
+  const degradedHomeMarketMessage = getDegradedHomeMarketMessage(homeQuery.data?.degraded ?? false);
 
   return (
     <main className="pv-page pv-stack">
@@ -213,6 +215,9 @@ export default function DashboardPage() {
                           <span className={`pv-chip ${getMarketSessionChipClass(item.marketSession ?? 'CLOSED')}`}>
                             {marketSession.statusLabel}
                           </span>
+                          {getStaleQuoteBadge(item.staleQuote) ? (
+                            <span className="pv-chip neutral">{getStaleQuoteBadge(item.staleQuote)}</span>
+                          ) : null}
                         </span>
                         <span className="pv-list-company">{item.companyName}</span>
                         {item.quoteTimestamp ? (
@@ -220,6 +225,9 @@ export default function DashboardPage() {
                             <span>{marketSession.priceLabel}</span>
                             <span>{formatMarketTimestamp(item.quoteTimestamp, item.marketTimezone ?? undefined)}</span>
                           </span>
+                        ) : null}
+                        {getStaleQuoteMessage(item.staleQuote) ? (
+                          <span className="pv-kicker">{getStaleQuoteMessage(item.staleQuote)}</span>
                         ) : null}
                       </div>
                       <div className="pv-list-secondary">
@@ -328,11 +336,18 @@ export default function DashboardPage() {
               message={webApi.getApiErrorMessage(homeQuery.error, 'Unable to load the home market board')}
             />
           ) : (
-            <div className="pv-list">
-              {homeQuery.data?.quotes.map((quote) => (
-                <QuoteRow key={quote.symbol} quote={quote} />
-              ))}
-            </div>
+            <>
+              {degradedHomeMarketMessage ? (
+                <div style={{ marginBottom: '12px' }}>
+                  <InlineNotice tone="info" message={degradedHomeMarketMessage} />
+                </div>
+              ) : null}
+              <div className="pv-list">
+                {homeQuery.data?.quotes.map((quote) => (
+                  <QuoteRow key={quote.symbol} quote={quote} />
+                ))}
+              </div>
+            </>
           )}
         </AppCard>
 
@@ -365,6 +380,9 @@ export default function DashboardPage() {
                           <span className={`pv-chip ${getMarketSessionChipClass(holding.marketSession ?? 'CLOSED')}`}>
                             {marketSession.statusLabel}
                           </span>
+                          {getStaleQuoteBadge(holding.staleQuote) ? (
+                            <span className="pv-chip neutral">{getStaleQuoteBadge(holding.staleQuote)}</span>
+                          ) : null}
                         </span>
                         <span className="pv-list-company">{holding.companyName}</span>
                         <span className="pv-list-meta-line">
@@ -376,6 +394,9 @@ export default function DashboardPage() {
                             <span>{marketSession.priceLabel}</span>
                             <span>{formatMarketTimestamp(holding.quoteTimestamp, holding.marketTimezone ?? undefined)}</span>
                           </span>
+                        ) : null}
+                        {getStaleQuoteMessage(holding.staleQuote) ? (
+                          <span className="pv-kicker">{getStaleQuoteMessage(holding.staleQuote)}</span>
                         ) : null}
                       </div>
                       <div className="pv-list-secondary">

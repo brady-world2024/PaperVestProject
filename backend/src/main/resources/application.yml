@@ -92,8 +92,12 @@ app:
     provider: ${MARKETDATA_PROVIDER:FINNHUB}
     request-timeout: ${MARKETDATA_REQUEST_TIMEOUT:PT4S}
     quote-cache-ttl: ${MARKETDATA_QUOTE_CACHE_TTL:PT30S}
+    quote-stale-grace-ttl: ${MARKETDATA_QUOTE_STALE_GRACE_TTL:PT15M}
     history-cache-ttl: ${MARKETDATA_HISTORY_CACHE_TTL:PT5M}
+    history-stale-grace-ttl: ${MARKETDATA_HISTORY_STALE_GRACE_TTL:P1D}
     search-cache-ttl: ${MARKETDATA_SEARCH_CACHE_TTL:PT5M}
+    search-stale-grace-ttl: ${MARKETDATA_SEARCH_STALE_GRACE_TTL:PT30M}
+    allow-partial-home-results: ${MARKETDATA_ALLOW_PARTIAL_HOME_RESULTS:true}
     home-symbols:
       - symbol: AAPL
         company-name: Apple

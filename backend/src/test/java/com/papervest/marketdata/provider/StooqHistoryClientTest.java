@@ -36,8 +36,12 @@ class StooqHistoryClientTest {
 				MarketDataProperties.ProviderType.FINNHUB,
 				Duration.ofSeconds(4),
 				Duration.ofSeconds(30),
+				Duration.ofMinutes(15),
 				Duration.ofMinutes(5),
+				Duration.ofDays(1),
 				Duration.ofMinutes(5),
+				Duration.ofMinutes(30),
+				true,
 				List.of(new MarketDataProperties.HomeSymbol("AAPL", "Apple")),
 				new MarketDataProperties.FinnhubProperties("https://finnhub.io/api/v1", "test-key")
 		));

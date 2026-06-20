@@ -24,6 +24,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -40,8 +41,11 @@ public class MarketDataService {
 	private final MarketDataProperties properties;
 	private final MarketDataProvider activeProvider;
 	private final Cache<String, StockQuote> quoteCache;
+	private final Cache<String, StockQuote> quoteStaleCache;
 	private final Cache<String, StockPriceHistory> historyCache;
+	private final Cache<String, StockPriceHistory> historyStaleCache;
 	private final Cache<String, List<StockSearchResult>> searchCache;
+	private final Cache<String, List<StockSearchResult>> searchStaleCache;
 	private final Cache<String, MarketStatusSnapshot> marketStatusCache;
 	private final Clock clock;
 
@@ -53,12 +57,24 @@ public class MarketDataService {
 				.expireAfterWrite(properties.quoteCacheTtl())
 				.maximumSize(512)
 				.build();
+		this.quoteStaleCache = Caffeine.newBuilder()
+				.expireAfterWrite(properties.quoteStaleGraceTtl())
+				.maximumSize(512)
+				.build();
 		this.historyCache = Caffeine.newBuilder()
 				.expireAfterWrite(properties.historyCacheTtl())
 				.maximumSize(256)
 				.build();
+		this.historyStaleCache = Caffeine.newBuilder()
+				.expireAfterWrite(properties.historyStaleGraceTtl())
+				.maximumSize(256)
+				.build();
 		this.searchCache = Caffeine.newBuilder()
 				.expireAfterWrite(properties.searchCacheTtl())
+				.maximumSize(128)
+				.build();
+		this.searchStaleCache = Caffeine.newBuilder()
+				.expireAfterWrite(properties.searchStaleGraceTtl())
 				.maximumSize(128)
 				.build();
 		this.marketStatusCache = Caffeine.newBuilder()
@@ -66,20 +82,48 @@ public class MarketDataService {
 				.maximumSize(8)
 				.build();
 		log.info(
-				"Market data service initialized provider={} quoteCacheTtl={} historyCacheTtl={} searchCacheTtl={}",
+				"Market data service initialized provider={} quoteCacheTtl={} quoteStaleGraceTtl={} historyCacheTtl={} historyStaleGraceTtl={} searchCacheTtl={} searchStaleGraceTtl={} allowPartialHomeResults={}",
 				activeProvider.providerType(),
 				properties.quoteCacheTtl(),
+				properties.quoteStaleGraceTtl(),
 				properties.historyCacheTtl(),
-				properties.searchCacheTtl()
+				properties.historyStaleGraceTtl(),
+				properties.searchCacheTtl(),
+				properties.searchStaleGraceTtl(),
+				properties.allowPartialHomeResults()
 		);
 	}
 
 	public HomeMarketResponse getHomeMarket() {
-		List<StockQuote> quotes = properties.homeSymbols()
-				.stream()
-				.map(symbol -> getQuote(symbol.symbol(), symbol.companyName()))
-				.toList();
-		return new HomeMarketResponse(quotes);
+		List<StockQuote> quotes = new ArrayList<>();
+		ApiException lastFailure = null;
+
+		for (MarketDataProperties.HomeSymbol homeSymbol : properties.homeSymbols()) {
+			try {
+				quotes.add(getQuote(homeSymbol.symbol(), homeSymbol.companyName()));
+			}
+			catch (ApiException ex) {
+				lastFailure = ex;
+				log.warn(
+						"Market data home symbol unavailable symbol={} provider={} code={} partialHomeResultsEnabled={}",
+						homeSymbol.symbol(),
+						activeProvider.providerType(),
+						ex.code(),
+						properties.allowPartialHomeResults()
+				);
+				if (!properties.allowPartialHomeResults()) {
+					throw ex;
+				}
+			}
+		}
+
+		if (quotes.isEmpty() && lastFailure != null) {
+			throw lastFailure;
+		}
+
+		boolean degraded = quotes.size() < properties.homeSymbols().size()
+				|| quotes.stream().anyMatch(StockQuote::stale);
+		return new HomeMarketResponse(List.copyOf(quotes), degraded);
 	}
 
 	public StockQuote getQuote(String symbol, String companyNameHint) {
@@ -90,16 +134,23 @@ public class MarketDataService {
 			return mergeCompanyName(cached, companyNameHint);
 		}
 		log.debug("Market data quote cache miss symbol={} provider={}", normalizedSymbol, activeProvider.providerType());
+		StockQuote staleFallback = quoteStaleCache.getIfPresent(normalizedSymbol);
 
 		try {
 			StockQuote fetched = enrichQuote(activeProvider.fetchQuote(normalizedSymbol));
-			StockQuote enriched = mergeCompanyName(fetched, companyNameHint);
-			quoteCache.put(normalizedSymbol, enriched);
+			StockQuote enriched = mergeCompanyName(fetched, companyNameHint).withStale(false);
+			cacheFreshQuote(normalizedSymbol, enriched);
 			return enriched;
 		}
 		catch (ApiException ex) {
-			if (cached != null) {
-				return mergeCompanyName(cached, companyNameHint).withStale(true);
+			if (staleFallback != null) {
+				log.warn(
+						"Serving stale market data quote symbol={} provider={} code={}",
+						normalizedSymbol,
+						activeProvider.providerType(),
+						ex.code()
+				);
+				return mergeCompanyName(staleFallback, companyNameHint).withStale(true);
 			}
 			throw ex;
 		}
@@ -130,15 +181,23 @@ public class MarketDataService {
 				range.value(),
 				activeProvider.providerType()
 		);
+		StockPriceHistory staleFallback = historyStaleCache.getIfPresent(cacheKey);
 
 		try {
 			StockPriceHistory fetched = activeProvider.fetchPriceHistory(normalizedSymbol, range);
-			historyCache.put(cacheKey, fetched);
+			cacheFreshHistory(cacheKey, fetched);
 			return fetched;
 		}
 		catch (ApiException ex) {
-			if (cached != null) {
-				return cached;
+			if (staleFallback != null) {
+				log.warn(
+						"Serving stale market data history symbol={} range={} provider={} code={}",
+						normalizedSymbol,
+						range.value(),
+						activeProvider.providerType(),
+						ex.code()
+				);
+				return staleFallback;
 			}
 			throw ex;
 		}
@@ -156,15 +215,22 @@ public class MarketDataService {
 			return cached;
 		}
 		log.debug("Market data search cache miss query={} provider={}", normalizedQuery, activeProvider.providerType());
+		List<StockSearchResult> staleFallback = searchStaleCache.getIfPresent(normalizedQuery);
 
 		try {
 			List<StockSearchResult> results = activeProvider.search(rawQuery.trim());
-			searchCache.put(normalizedQuery, results);
+			cacheFreshSearch(normalizedQuery, results);
 			return results;
 		}
 		catch (ApiException ex) {
-			if (cached != null) {
-				return cached;
+			if (staleFallback != null) {
+				log.warn(
+						"Serving stale market data search query={} provider={} code={}",
+						normalizedQuery,
+						activeProvider.providerType(),
+						ex.code()
+				);
+				return staleFallback;
 			}
 			throw ex;
 		}
@@ -172,8 +238,11 @@ public class MarketDataService {
 
 	public void clearRuntimeCaches() {
 		quoteCache.invalidateAll();
+		quoteStaleCache.invalidateAll();
 		historyCache.invalidateAll();
+		historyStaleCache.invalidateAll();
 		searchCache.invalidateAll();
+		searchStaleCache.invalidateAll();
 		marketStatusCache.invalidateAll();
 		log.info("Market data runtime caches cleared provider={}", activeProvider.providerType());
 	}
@@ -223,6 +292,22 @@ public class MarketDataService {
 		MarketStatusSnapshot fetched = activeProvider.fetchMarketStatus(exchange);
 		marketStatusCache.put(exchange, fetched);
 		return fetched;
+	}
+
+	private void cacheFreshQuote(String normalizedSymbol, StockQuote quote) {
+		quoteCache.put(normalizedSymbol, quote);
+		quoteStaleCache.put(normalizedSymbol, quote.withStale(false));
+	}
+
+	private void cacheFreshHistory(String cacheKey, StockPriceHistory history) {
+		historyCache.put(cacheKey, history);
+		historyStaleCache.put(cacheKey, history);
+	}
+
+	private void cacheFreshSearch(String normalizedQuery, List<StockSearchResult> results) {
+		List<StockSearchResult> immutableResults = List.copyOf(results);
+		searchCache.put(normalizedQuery, immutableResults);
+		searchStaleCache.put(normalizedQuery, immutableResults);
 	}
 
 	private MarketSessionState classifySession(

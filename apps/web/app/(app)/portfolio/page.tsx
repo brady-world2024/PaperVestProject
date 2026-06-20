@@ -12,6 +12,7 @@ import { InlineNotice } from '@/components/inline-notice';
 import { MetricCard } from '@/components/metric-card';
 import { PortfolioHistoryChart } from '@/components/portfolio-history-chart';
 import { SectionHeader } from '@/components/section-header';
+import { getStaleQuoteBadge, getStaleQuoteMessage } from '@/lib/market-data-freshness';
 import { liveQuoteRefreshOptions } from '@/lib/market-data-refresh';
 import { getMarketSessionChipClass } from '@/lib/market-session';
 import { queryKeys } from '@/lib/query-keys';
@@ -160,6 +161,9 @@ export default function PortfolioPage() {
                           <span className={`pv-chip ${getMarketSessionChipClass(holding.marketSession ?? 'CLOSED')}`}>
                             {marketSession.statusLabel}
                           </span>
+                          {getStaleQuoteBadge(holding.staleQuote) ? (
+                            <span className="pv-chip neutral">{getStaleQuoteBadge(holding.staleQuote)}</span>
+                          ) : null}
                         </span>
                         <span className="pv-list-company">{holding.companyName}</span>
                         <span className="pv-list-meta-line">
@@ -171,6 +175,9 @@ export default function PortfolioPage() {
                             <span>{marketSession.priceLabel}</span>
                             <span>{formatMarketTimestamp(holding.quoteTimestamp, holding.marketTimezone ?? undefined)}</span>
                           </span>
+                        ) : null}
+                        {getStaleQuoteMessage(holding.staleQuote) ? (
+                          <span className="pv-kicker">{getStaleQuoteMessage(holding.staleQuote)}</span>
                         ) : null}
                       </div>
                       <div className="pv-list-secondary">

@@ -125,6 +125,7 @@ export type Quote = {
 
 export type HomeMarketResponse = {
   quotes: Quote[];
+  degraded: boolean;
 };
 
 export type StockSearchResult = {

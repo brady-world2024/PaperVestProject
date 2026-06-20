@@ -58,8 +58,12 @@ public class PaperVestOperationsInfoContributor implements InfoContributor {
 						"provider", marketDataProperties.provider().name(),
 						"requestTimeout", marketDataProperties.requestTimeout().toString(),
 						"quoteCacheTtl", marketDataProperties.quoteCacheTtl().toString(),
+						"quoteStaleGraceTtl", marketDataProperties.quoteStaleGraceTtl().toString(),
 						"historyCacheTtl", marketDataProperties.historyCacheTtl().toString(),
+						"historyStaleGraceTtl", marketDataProperties.historyStaleGraceTtl().toString(),
 						"searchCacheTtl", marketDataProperties.searchCacheTtl().toString(),
+						"searchStaleGraceTtl", marketDataProperties.searchStaleGraceTtl().toString(),
+						"allowPartialHomeResults", marketDataProperties.allowPartialHomeResults(),
 						"homeSymbolsCount", marketDataProperties.homeSymbols().size()
 				))
 				.withDetail("conditionalOrders", Map.of(

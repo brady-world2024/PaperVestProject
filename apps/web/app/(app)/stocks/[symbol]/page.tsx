@@ -12,6 +12,7 @@ import { MetricCard } from '@/components/metric-card';
 import { SectionHeader } from '@/components/section-header';
 import { StockHistoryChart } from '@/components/stock-history-chart';
 import { TradeOrderCard } from '@/components/trade-order-card';
+import { getStaleQuoteBadge, getStaleQuoteMessage } from '@/lib/market-data-freshness';
 import { liveQuoteRefreshOptions } from '@/lib/market-data-refresh';
 import { describeMarketSession, getMarketSessionChipClass } from '@/lib/market-session';
 import { queryKeys } from '@/lib/query-keys';
@@ -178,6 +179,7 @@ export default function StockDetailPage() {
   const tradingBlockedMessage = quote.tradingEnabled
     ? null
     : `${marketSession.statusLabel} session. Paper trading is only available during regular market hours.`;
+  const staleQuoteMessage = getStaleQuoteMessage(quote.stale);
 
   return (
     <main className="pv-page pv-stock-layout">
@@ -214,6 +216,9 @@ export default function StockDetailPage() {
                 <span className={`pv-chip ${getMarketSessionChipClass(quote.marketSession)}`}>
                   {marketSession.statusLabel}
                 </span>
+                {getStaleQuoteBadge(quote.stale) ? (
+                  <span className="pv-chip neutral">{getStaleQuoteBadge(quote.stale)}</span>
+                ) : null}
                 <span className="pv-kicker pv-kicker-inverse">{marketSession.priceLabel}</span>
               </div>
               <div className="pv-stock-price">{formatCurrency(currentPrice)}</div>
@@ -237,6 +242,7 @@ export default function StockDetailPage() {
           </div>
 
           {watchlistErrorMessage ? <InlineNotice tone="error" message={watchlistErrorMessage} /> : null}
+          {staleQuoteMessage ? <InlineNotice tone="info" message={staleQuoteMessage} /> : null}
         </AppCard>
 
         <AppCard className="pv-chart-card">
@@ -261,6 +267,9 @@ export default function StockDetailPage() {
                 <span className={`pv-chip ${getMarketSessionChipClass(quote.marketSession)}`}>
                   {marketSession.statusLabel}
                 </span>
+                {getStaleQuoteBadge(quote.stale) ? (
+                  <span className="pv-chip neutral">{getStaleQuoteBadge(quote.stale)}</span>
+                ) : null}
                 <span className="pv-kicker">
                   {marketSession.priceLabel} · {formatMarketTimestamp(quote.quoteTimestamp, quote.marketTimezone)}
                 </span>
