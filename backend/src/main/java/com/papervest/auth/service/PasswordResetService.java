@@ -5,6 +5,7 @@ import com.papervest.auth.repository.PasswordResetTokenRepository;
 import com.papervest.common.config.AccountLifecycleProperties;
 import com.papervest.common.exception.BadRequestException;
 import com.papervest.common.util.TokenHashingUtils;
+import com.papervest.notification.service.NotificationService;
 import com.papervest.user.model.User;
 import com.papervest.user.repository.UserRepository;
 import org.slf4j.Logger;
@@ -28,6 +29,7 @@ public class PasswordResetService {
 	private final AccountLifecycleMessageService messageService;
 	private final PasswordEncoder passwordEncoder;
 	private final RefreshTokenService refreshTokenService;
+	private final NotificationService notificationService;
 	private final Clock clock;
 
 	public PasswordResetService(
@@ -38,6 +40,7 @@ public class PasswordResetService {
 			AccountLifecycleMessageService messageService,
 			PasswordEncoder passwordEncoder,
 			RefreshTokenService refreshTokenService,
+			NotificationService notificationService,
 			Clock clock
 	) {
 		this.tokenRepository = tokenRepository;
@@ -47,6 +50,7 @@ public class PasswordResetService {
 		this.messageService = messageService;
 		this.passwordEncoder = passwordEncoder;
 		this.refreshTokenService = refreshTokenService;
+		this.notificationService = notificationService;
 		this.clock = clock;
 	}
 
@@ -79,6 +83,7 @@ public class PasswordResetService {
 		token.consume(clock.instant());
 		user.changePasswordHash(passwordEncoder.encode(nextPassword));
 		refreshTokenService.revokeAllForUser(user.getId());
+		notificationService.notifyPasswordChanged(user);
 		log.info(
 				"Password reset completed userId={} email={}",
 				user.getId(),

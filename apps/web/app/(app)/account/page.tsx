@@ -72,6 +72,7 @@ export default function AccountPage() {
     },
     onSuccess: async (response) => {
       await completeAuth(response);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.notifications });
       changePasswordForm.reset();
       setChangePasswordNotice('Password updated. Older sessions were revoked and this browser received a fresh session.');
     },

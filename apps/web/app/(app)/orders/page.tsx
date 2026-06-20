@@ -94,7 +94,10 @@ export default function OrdersPage() {
       });
     },
     onSuccess: async (_, values) => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.conditionalOrders });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.conditionalOrders }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.notifications }),
+      ]);
       await refreshCsrfBootstrap();
       reset({
         symbol: values.symbol.trim().toUpperCase(),
@@ -115,6 +118,7 @@ export default function OrdersPage() {
         queryClient.invalidateQueries({ queryKey: queryKeys.conditionalOrders }),
         queryClient.invalidateQueries({ queryKey: queryKeys.portfolio }),
         queryClient.invalidateQueries({ queryKey: queryKeys.tradeHistory }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.notifications }),
       ]);
       await refreshCsrfBootstrap();
     },

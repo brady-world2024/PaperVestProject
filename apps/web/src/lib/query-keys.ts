@@ -1,6 +1,7 @@
 export const queryKeys = {
   accountProfile: ['account-profile'] as const,
   home: ['home-market'] as const,
+  notifications: ['notifications'] as const,
   portfolio: ['portfolio'] as const,
   portfolioHistoryRoot: ['portfolio-history'] as const,
   portfolioHistory: (range: string) => ['portfolio-history', range] as const,

@@ -9,6 +9,7 @@ import com.papervest.auth.service.RefreshTokenService;
 import com.papervest.common.exception.AuthenticationException;
 import com.papervest.common.exception.BadRequestException;
 import com.papervest.common.exception.ResourceNotFoundException;
+import com.papervest.notification.service.NotificationService;
 import com.papervest.user.model.User;
 import com.papervest.user.repository.UserRepository;
 import org.slf4j.Logger;
@@ -28,19 +29,22 @@ public class AccountService {
 	private final RefreshTokenService refreshTokenService;
 	private final AuthService authService;
 	private final EmailVerificationService emailVerificationService;
+	private final NotificationService notificationService;
 
 	public AccountService(
 			UserRepository userRepository,
 			PasswordEncoder passwordEncoder,
 			RefreshTokenService refreshTokenService,
 			AuthService authService,
-			EmailVerificationService emailVerificationService
+			EmailVerificationService emailVerificationService,
+			NotificationService notificationService
 	) {
 		this.userRepository = userRepository;
 		this.passwordEncoder = passwordEncoder;
 		this.refreshTokenService = refreshTokenService;
 		this.authService = authService;
 		this.emailVerificationService = emailVerificationService;
+		this.notificationService = notificationService;
 	}
 
 	@Transactional(readOnly = true)
@@ -74,6 +78,7 @@ public class AccountService {
 				maskEmail(user.getEmail()),
 				normalizeDeviceName(request.deviceName())
 		);
+		notificationService.notifyPasswordChanged(user);
 		return authService.issueFreshSession(user, request.deviceName());
 	}
 

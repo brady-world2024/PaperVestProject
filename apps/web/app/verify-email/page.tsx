@@ -24,7 +24,10 @@ function VerifyEmailContent() {
       return webApi.confirmEmailVerification({ token: verificationToken });
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.accountProfile });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.accountProfile }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.notifications }),
+      ]);
     },
   });
 

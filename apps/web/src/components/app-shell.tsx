@@ -1,21 +1,24 @@
 'use client';
 
 import Link from 'next/link';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { usePathname } from 'next/navigation';
-import { useQueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 
 import { AppButton } from './app-button';
 import { BrandLogo } from './brand-logo';
+import { webApi } from '@/lib/api';
+import { queryKeys } from '@/lib/query-keys';
 import { useAuthStore } from '@/state/auth-store';
 
 const navItems = [
-  { href: '/dashboard', label: 'Dashboard' },
-  { href: '/orders', label: 'Orders' },
-  { href: '/watchlist', label: 'Watchlist' },
-  { href: '/portfolio', label: 'Portfolio' },
-  { href: '/activity', label: 'Activity' },
-  { href: '/account', label: 'Account' },
+  { href: '/dashboard', label: 'Dashboard', meta: 'Desk overview' },
+  { href: '/notifications', label: 'Notifications', meta: 'Order + account inbox' },
+  { href: '/orders', label: 'Orders', meta: 'Target-price orders' },
+  { href: '/watchlist', label: 'Watchlist', meta: 'Saved symbols' },
+  { href: '/portfolio', label: 'Portfolio', meta: 'Holdings + P&L' },
+  { href: '/activity', label: 'Activity', meta: 'Trade ledger' },
+  { href: '/account', label: 'Account', meta: 'Security + lifecycle' },
 ];
 
 const pageMeta = [
@@ -23,6 +26,11 @@ const pageMeta = [
     match: (pathname: string) => pathname.startsWith('/dashboard'),
     title: 'Dashboard',
     description: 'Search symbols, review portfolio state, and move into trade entry.',
+  },
+  {
+    match: (pathname: string) => pathname.startsWith('/notifications'),
+    title: 'Notifications',
+    description: 'Backend-owned order and account events with unread state and simple inbox controls.',
   },
   {
     match: (pathname: string) => pathname.startsWith('/orders'),
@@ -62,6 +70,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   const user = useAuthStore((state) => state.user);
   const signOut = useAuthStore((state) => state.signOut);
   const currentPage = pageMeta.find((entry) => entry.match(pathname));
+  const notificationsQuery = useQuery({
+    queryKey: queryKeys.notifications,
+    queryFn: webApi.getNotifications,
+    enabled: Boolean(user),
+    refetchInterval: 30000,
+  });
+  const unreadNotifications = notificationsQuery.data?.unreadCount ?? 0;
 
   return (
     <div className="pv-app-shell">
@@ -79,20 +94,13 @@ export function AppShell({ children }: { children: ReactNode }) {
                 data-active={pathname === item.href || pathname.startsWith(`${item.href}/`)}
                 href={item.href}
               >
-                <span className="pv-shell-nav-label">{item.label}</span>
-                <span className="pv-shell-nav-meta">
-                  {item.href === '/dashboard'
-                    ? 'Desk overview'
-                    : item.href === '/orders'
-                      ? 'Target-price orders'
-                    : item.href === '/watchlist'
-                      ? 'Saved symbols'
-                      : item.href === '/portfolio'
-                        ? 'Holdings + P&L'
-                        : item.href === '/activity'
-                          ? 'Trade ledger'
-                          : 'Security + lifecycle'}
+                <span className="pv-shell-nav-label-row">
+                  <span className="pv-shell-nav-label">{item.label}</span>
+                  {item.href === '/notifications' && unreadNotifications > 0 ? (
+                    <span className="pv-shell-nav-badge">{unreadNotifications}</span>
+                  ) : null}
                 </span>
+                <span className="pv-shell-nav-meta">{item.meta}</span>
               </Link>
             ))}
           </nav>
@@ -130,6 +138,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="pv-shell-topbar-actions">
             <Link className="pv-shell-topbar-link" href="/dashboard">
               Search market
+            </Link>
+            <Link className="pv-shell-topbar-link" href="/notifications">
+              Notifications
             </Link>
             <Link className="pv-shell-topbar-link" href="/orders">
               Conditional orders

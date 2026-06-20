@@ -104,14 +104,25 @@ class PostgresIntegrationTest extends AbstractContainerIntegrationTest {
 					""",
 				Integer.class
 		);
+		Integer userNotificationIndexes = jdbcTemplate.queryForObject(
+				"""
+					select count(*)
+					from pg_indexes
+					where schemaname = 'public'
+					  and tablename = 'user_notifications'
+					  and indexname = 'ix_user_notifications_user_id_created_at'
+					""",
+				Integer.class
+		);
 
-		assertThat(appliedMigrations).isEqualTo(4);
+		assertThat(appliedMigrations).isEqualTo(5);
 		assertThat(metadataColumnType).isEqualTo("jsonb");
 		assertThat(executionKeyIndexes).isEqualTo(1);
 		assertThat(schedulerIndexes).isEqualTo(1);
 		assertThat(emailTokenIndexes).isEqualTo(1);
 		assertThat(passwordResetTokenIndexes).isEqualTo(1);
 		assertThat(portfolioSnapshotIndexes).isEqualTo(1);
+		assertThat(userNotificationIndexes).isEqualTo(1);
 	}
 
 	@Test

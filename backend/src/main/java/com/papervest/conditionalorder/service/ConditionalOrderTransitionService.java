@@ -8,6 +8,7 @@ import com.papervest.conditionalorder.model.ConditionalOrderStatus;
 import com.papervest.conditionalorder.model.ConditionalOrderStatusEvent;
 import com.papervest.conditionalorder.repository.ConditionalOrderRepository;
 import com.papervest.conditionalorder.repository.ConditionalOrderStatusEventRepository;
+import com.papervest.notification.service.NotificationService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,15 +22,18 @@ public class ConditionalOrderTransitionService {
 	private final ConditionalOrderRepository conditionalOrderRepository;
 	private final ConditionalOrderStatusEventRepository statusEventRepository;
 	private final ObjectMapper objectMapper;
+	private final NotificationService notificationService;
 
 	public ConditionalOrderTransitionService(
 			ConditionalOrderRepository conditionalOrderRepository,
 			ConditionalOrderStatusEventRepository statusEventRepository,
-			ObjectMapper objectMapper
+			ObjectMapper objectMapper,
+			NotificationService notificationService
 	) {
 		this.conditionalOrderRepository = conditionalOrderRepository;
 		this.statusEventRepository = statusEventRepository;
 		this.objectMapper = objectMapper;
+		this.notificationService = notificationService;
 	}
 
 	@Transactional
@@ -42,6 +46,7 @@ public class ConditionalOrderTransitionService {
 				"Conditional order created",
 				null
 		));
+		notificationService.notifyConditionalOrderCreated(order);
 	}
 
 	@Transactional
@@ -217,6 +222,7 @@ public class ConditionalOrderTransitionService {
 				reasonMessage,
 				toMetadataJson(metadata)
 		));
+		notificationService.notifyConditionalOrderStatusChanged(order, toStatus, reasonMessage);
 		return true;
 	}
 

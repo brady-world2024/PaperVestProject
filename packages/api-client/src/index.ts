@@ -14,6 +14,7 @@ import type {
   DeleteAccountPayload,
   EmailVerificationResult,
   LoginPayload,
+  NotificationListResponse,
   PortfolioHistoryRange,
   PortfolioHistoryResponse,
   PortfolioResponse,
@@ -252,6 +253,27 @@ export function createPapervestApiClient({
         params: { range },
       });
       return data;
+    },
+    async getNotifications() {
+      const { data } = await apiClient.get<NotificationListResponse>('/notifications');
+      return data;
+    },
+    async markNotificationRead(notificationId: string) {
+      const previousCookieToken = resolveCookieCsrfToken();
+      await ensureCookieCsrfToken();
+      const { data } = await apiClient.post<NotificationListResponse['notifications'][number]>(
+        `/notifications/${notificationId}/read`,
+        {},
+        buildCookieWriteConfig()
+      );
+      await stabilizeCookieCsrfToken(previousCookieToken);
+      return data;
+    },
+    async markAllNotificationsRead() {
+      const previousCookieToken = resolveCookieCsrfToken();
+      await ensureCookieCsrfToken();
+      await apiClient.post('/notifications/read-all', {}, buildCookieWriteConfig());
+      await stabilizeCookieCsrfToken(previousCookieToken);
     },
     async getAccountProfile() {
       const { data } = await apiClient.get<AccountProfile>('/account');

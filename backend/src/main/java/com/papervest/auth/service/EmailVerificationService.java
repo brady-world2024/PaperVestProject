@@ -6,6 +6,7 @@ import com.papervest.common.config.AccountLifecycleProperties;
 import com.papervest.common.exception.BadRequestException;
 import com.papervest.common.exception.ResourceNotFoundException;
 import com.papervest.common.util.TokenHashingUtils;
+import com.papervest.notification.service.NotificationService;
 import com.papervest.user.model.User;
 import com.papervest.user.repository.UserRepository;
 import org.slf4j.Logger;
@@ -26,6 +27,7 @@ public class EmailVerificationService {
 	private final AccountLifecycleProperties properties;
 	private final OneTimeTokenFactory tokenFactory;
 	private final AccountLifecycleMessageService messageService;
+	private final NotificationService notificationService;
 	private final Clock clock;
 
 	public EmailVerificationService(
@@ -34,6 +36,7 @@ public class EmailVerificationService {
 			AccountLifecycleProperties properties,
 			OneTimeTokenFactory tokenFactory,
 			AccountLifecycleMessageService messageService,
+			NotificationService notificationService,
 			Clock clock
 	) {
 		this.tokenRepository = tokenRepository;
@@ -41,6 +44,7 @@ public class EmailVerificationService {
 		this.properties = properties;
 		this.tokenFactory = tokenFactory;
 		this.messageService = messageService;
+		this.notificationService = notificationService;
 		this.clock = clock;
 	}
 
@@ -71,6 +75,7 @@ public class EmailVerificationService {
 
 		token.consume(clock.instant());
 		user.markEmailVerified(clock.instant());
+		notificationService.notifyEmailVerified(user);
 		log.info(
 				"Email verification confirmed userId={} email={}",
 				user.getId(),

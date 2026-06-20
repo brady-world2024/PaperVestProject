@@ -231,6 +231,32 @@ export type PortfolioHistoryResponse = {
   points: PortfolioHistoryPoint[];
 };
 
+export type NotificationType =
+  | 'CONDITIONAL_ORDER_CREATED'
+  | 'CONDITIONAL_ORDER_TRIGGERED'
+  | 'CONDITIONAL_ORDER_FILLED'
+  | 'CONDITIONAL_ORDER_FAILED'
+  | 'CONDITIONAL_ORDER_CANCELLED'
+  | 'CONDITIONAL_ORDER_EXPIRED'
+  | 'EMAIL_VERIFIED'
+  | 'PASSWORD_CHANGED';
+
+export type UserNotification = {
+  id: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  actionPath: string | null;
+  read: boolean;
+  readAt: string | null;
+  createdAt: string;
+};
+
+export type NotificationListResponse = {
+  unreadCount: number;
+  notifications: UserNotification[];
+};
+
 export type AccountProfile = {
   userId: string;
   email: string;

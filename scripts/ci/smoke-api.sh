@@ -26,6 +26,7 @@ DETAIL_JSON="$TMP_DIR/detail.json"
 HISTORY_JSON="$TMP_DIR/history.json"
 PORTFOLIO_JSON="$TMP_DIR/portfolio.json"
 PORTFOLIO_HISTORY_JSON="$TMP_DIR/portfolio-history.json"
+NOTIFICATIONS_JSON="$TMP_DIR/notifications.json"
 CREATE_ORDER_JSON="$TMP_DIR/create-order.json"
 LIST_ORDERS_JSON="$TMP_DIR/list-orders.json"
 CANCEL_ORDER_JSON="$TMP_DIR/cancel-order.json"
@@ -262,6 +263,16 @@ if [[ "$trades_status" != "200" ]]; then
   exit 1
 fi
 json_get "$TRADES_JSON" "trades" >/dev/null
+
+echo "==> Checking notifications inbox path"
+notifications_status="$(curl -sS -o "$NOTIFICATIONS_JSON" -w "%{http_code}" -H "Authorization: Bearer $ACCESS_TOKEN" "$API_BASE/notifications")"
+if [[ "$notifications_status" != "200" ]]; then
+  echo "Notifications request failed with status $notifications_status"
+  cat "$NOTIFICATIONS_JSON"
+  exit 1
+fi
+json_get "$NOTIFICATIONS_JSON" "notifications" >/dev/null
+json_get "$NOTIFICATIONS_JSON" "unreadCount" >/dev/null
 
 if [[ "$SMOKE_TEST_MODE" == "read-only-login" ]]; then
   echo "Smoke verification passed for $API_BASE"
