@@ -1,7 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
+import { AppButton } from '@/components/app-button';
 import { AppButtonLink } from '@/components/app-button';
 import { AppCard } from '@/components/app-card';
 import { EmptyState } from '@/components/empty-state';
@@ -9,6 +11,8 @@ import { InlineNotice } from '@/components/inline-notice';
 import { SectionHeader } from '@/components/section-header';
 import { queryKeys } from '@/lib/query-keys';
 import { webApi } from '@/lib/api';
+import { useWorkspaceDensity } from '@/lib/use-workspace-density';
+import { sortTrades, type TradeSort } from '@/lib/workspace-grids';
 import {
   formatCurrency,
   formatDateTime,
@@ -17,10 +21,13 @@ import {
 } from '@/lib/formatters';
 
 export default function ActivityPage() {
+  const { density, setDensity } = useWorkspaceDensity('pv-activity-density');
+  const [sort, setSort] = useState<TradeSort>('latest');
   const historyQuery = useQuery({
     queryKey: queryKeys.tradeHistory,
     queryFn: webApi.getTradeHistory,
   });
+  const trades = sortTrades(historyQuery.data?.trades ?? [], sort);
 
   return (
     <main className="pv-page pv-stack">
@@ -34,14 +41,55 @@ export default function ActivityPage() {
 
       <section className="pv-card">
         <SectionHeader
-          title="Recent trades"
-          subtitle="This route mirrors the mobile activity tab and reads the same `/api/trades/history` response."
+          title="Execution ledger"
+          subtitle="A denser trade workspace that behaves more like a ledger than a stack of isolated cards."
           action={
             <AppButtonLink href="/portfolio" variant="ghost">
               Open portfolio
             </AppButtonLink>
           }
         />
+
+        <div className="pv-workspace-toolbar">
+          <div className="pv-workspace-toolbar-copy">
+            <strong>Ledger controls</strong>
+            <span>Scan the latest executions, or sort by the trades that moved realized P&amp;L the most.</span>
+          </div>
+          <div className="pv-workspace-controls">
+            <div className="pv-density-toggle">
+              <AppButton
+                variant={density === 'comfortable' ? 'secondary' : 'ghost'}
+                className="pv-density-button"
+                onClick={() => setDensity('comfortable')}
+              >
+                Comfortable
+              </AppButton>
+              <AppButton
+                variant={density === 'compact' ? 'secondary' : 'ghost'}
+                className="pv-density-button"
+                onClick={() => setDensity('compact')}
+              >
+                Compact
+              </AppButton>
+            </div>
+            <div className="pv-workspace-select-wrap">
+              <label className="pv-kicker" htmlFor="activity-sort">
+                Sort by
+              </label>
+              <select
+                id="activity-sort"
+                className="pv-input pv-workspace-select"
+                value={sort}
+                onChange={(event) => setSort(event.target.value as TradeSort)}
+              >
+                <option value="latest">Latest execution</option>
+                <option value="realizedPnl">Realized P&amp;L</option>
+                <option value="grossAmount">Gross amount</option>
+                <option value="symbol">Symbol</option>
+              </select>
+            </div>
+          </div>
+        </div>
 
         {historyQuery.isLoading ? (
           <div className="pv-subgrid">
@@ -53,49 +101,55 @@ export default function ActivityPage() {
             tone="error"
             message={webApi.getApiErrorMessage(historyQuery.error, 'Unable to load trade history')}
           />
-        ) : historyQuery.data?.trades.length ? (
-          <div className="pv-subgrid">
-            {historyQuery.data.trades.map((trade) => (
-              <AppCard key={trade.tradeId}>
-                <div className="pv-list-row-head">
-                  <div className="pv-list-primary">
-                    <span className="pv-list-symbol-line">
-                      <span className="pv-list-symbol">{trade.symbol}</span>
-                      <span className={`pv-chip ${trade.side === 'BUY' ? 'buy' : 'sell'}`}>
-                        {trade.side}
-                      </span>
+        ) : trades.length ? (
+          <div className={`pv-workspace-table seven-column ${density}`}>
+            <div className="pv-workspace-header">
+              <span>Trade</span>
+              <span>Quantity</span>
+              <span>Price</span>
+              <span>Gross amount</span>
+              <span>Cash after</span>
+              <span>Realized</span>
+              <span>Executed</span>
+            </div>
+            {trades.map((trade) => (
+              <div className={`pv-workspace-row ${density}`} key={trade.tradeId}>
+                <div className="pv-workspace-cell primary">
+                  <span className="pv-list-symbol-line">
+                    <span className="pv-list-symbol">{trade.symbol}</span>
+                    <span className={`pv-chip ${trade.side === 'BUY' ? 'buy' : 'sell'}`}>
+                      {trade.side}
                     </span>
-                    <span className="pv-list-company">{trade.companyName}</span>
+                  </span>
+                  <span className="pv-list-company">{trade.companyName}</span>
+                  {density === 'comfortable' ? (
                     <span className="pv-list-meta-line">
-                      <span>{formatShares(trade.quantity)}</span>
-                      <span>{formatDateTime(trade.executedAt)}</span>
+                      <span>Trade ID</span>
+                      <span>{trade.tradeId}</span>
                     </span>
-                  </div>
-                  <div className="pv-list-secondary">
-                    <strong>{formatCurrency(trade.executedPrice)}</strong>
-                    <span className={trade.realizedPnl >= 0 ? 'pv-positive' : 'pv-negative'}>
-                      {formatSignedCurrency(trade.realizedPnl)}
-                    </span>
-                  </div>
+                  ) : null}
                 </div>
-
-                <div className="pv-activity-detail-grid">
-                  <div className="pv-activity-detail-cell">
-                    <span className="pv-kicker">Gross amount</span>
-                    <strong>{formatCurrency(trade.grossAmount)}</strong>
-                  </div>
-                  <div className="pv-activity-detail-cell">
-                    <span className="pv-kicker">Cash after trade</span>
-                    <strong>{formatCurrency(trade.cashBalanceAfterTrade)}</strong>
-                  </div>
-                  <div className="pv-activity-detail-cell">
-                    <span className="pv-kicker">Realized P&amp;L</span>
-                    <strong className={trade.realizedPnl >= 0 ? 'pv-positive' : 'pv-negative'}>
-                      {formatSignedCurrency(trade.realizedPnl)}
-                    </strong>
-                  </div>
+                <div className="pv-workspace-cell numeric">
+                  <strong>{formatShares(trade.quantity)}</strong>
                 </div>
-              </AppCard>
+                <div className="pv-workspace-cell numeric">
+                  <strong>{formatCurrency(trade.executedPrice)}</strong>
+                </div>
+                <div className="pv-workspace-cell numeric">
+                  <strong>{formatCurrency(trade.grossAmount)}</strong>
+                </div>
+                <div className="pv-workspace-cell numeric">
+                  <strong>{formatCurrency(trade.cashBalanceAfterTrade)}</strong>
+                </div>
+                <div className="pv-workspace-cell numeric">
+                  <span className={trade.realizedPnl >= 0 ? 'pv-positive' : 'pv-negative'}>
+                    {formatSignedCurrency(trade.realizedPnl)}
+                  </span>
+                </div>
+                <div className="pv-workspace-cell">
+                  <span className="pv-kicker">{formatDateTime(trade.executedAt)}</span>
+                </div>
+              </div>
             ))}
           </div>
         ) : (

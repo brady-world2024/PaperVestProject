@@ -14,12 +14,28 @@ import {
 import { AppButton } from '@/components/app-button';
 import { AppCard } from '@/components/app-card';
 import { AppField } from '@/components/app-field';
-import { ConditionalOrderList } from '@/components/conditional-orders/conditional-order-list';
 import { InlineNotice } from '@/components/inline-notice';
 import { MetricCard } from '@/components/metric-card';
 import { SectionHeader } from '@/components/section-header';
+import {
+  canCancelConditionalOrder,
+  conditionalOrderFailureSummary,
+  conditionalOrderStatusTone,
+} from '@/lib/conditional-orders/presentation';
 import { queryKeys } from '@/lib/query-keys';
 import { webApi } from '@/lib/api';
+import { useWorkspaceDensity } from '@/lib/use-workspace-density';
+import {
+  filterConditionalOrders,
+  sortConditionalOrders,
+  type OrderFilter,
+  type OrderSort,
+} from '@/lib/workspace-grids';
+import {
+  formatCurrency,
+  formatDateTime,
+  formatShares,
+} from '@/lib/formatters';
 
 export default function OrdersPage() {
   const queryClient = useQueryClient();
@@ -31,6 +47,9 @@ export default function OrdersPage() {
   const [submitLocked, setSubmitLocked] = useState(false);
   const [csrfReady, setCsrfReady] = useState(false);
   const [csrfBootstrapError, setCsrfBootstrapError] = useState<unknown>(null);
+  const [orderSort, setOrderSort] = useState<OrderSort>('latest');
+  const [orderFilter, setOrderFilter] = useState<OrderFilter>('all');
+  const { density, setDensity } = useWorkspaceDensity('pv-orders-density');
 
   const {
     register,
@@ -125,6 +144,7 @@ export default function OrdersPage() {
   });
 
   const orders = ordersQuery.data?.orders ?? [];
+  const visibleOrders = sortConditionalOrders(filterConditionalOrders(orders, orderFilter), orderSort);
   const activeCount = orders.filter((order) => order.status === 'ACTIVE').length;
   const pendingCount = orders.filter(
     (order) => order.status === 'TRIGGERED' || order.status === 'EXECUTING'
@@ -252,7 +272,65 @@ export default function OrdersPage() {
 
       <section className="pv-stack">
         <AppCard>
-          <SectionHeader title="Conditional orders" />
+          <SectionHeader
+            title="Conditional orders workspace"
+            subtitle="Filter active automation, rank by newest or price level, and scan backend-owned state faster."
+          />
+          <div className="pv-workspace-toolbar">
+            <div className="pv-workspace-toolbar-copy">
+              <strong>Order workspace</strong>
+              <span>Use density, sort, and state filters to scan conditional orders more like a real blotter.</span>
+            </div>
+            <div className="pv-workspace-controls">
+              <div className="pv-density-toggle">
+                <AppButton
+                  variant={density === 'comfortable' ? 'secondary' : 'ghost'}
+                  className="pv-density-button"
+                  onClick={() => setDensity('comfortable')}
+                >
+                  Comfortable
+                </AppButton>
+                <AppButton
+                  variant={density === 'compact' ? 'secondary' : 'ghost'}
+                  className="pv-density-button"
+                  onClick={() => setDensity('compact')}
+                >
+                  Compact
+                </AppButton>
+              </div>
+              <div className="pv-workspace-select-wrap">
+                <label className="pv-kicker" htmlFor="order-filter">
+                  Filter
+                </label>
+                <select
+                  id="order-filter"
+                  className="pv-input pv-workspace-select"
+                  value={orderFilter}
+                  onChange={(event) => setOrderFilter(event.target.value as OrderFilter)}
+                >
+                  <option value="all">All orders</option>
+                  <option value="active">Active / pending</option>
+                  <option value="terminal">Terminal states</option>
+                </select>
+              </div>
+              <div className="pv-workspace-select-wrap">
+                <label className="pv-kicker" htmlFor="order-sort">
+                  Sort by
+                </label>
+                <select
+                  id="order-sort"
+                  className="pv-input pv-workspace-select"
+                  value={orderSort}
+                  onChange={(event) => setOrderSort(event.target.value as OrderSort)}
+                >
+                  <option value="latest">Newest created</option>
+                  <option value="status">Status</option>
+                  <option value="targetPrice">Target price</option>
+                  <option value="symbol">Symbol</option>
+                </select>
+              </div>
+            </div>
+          </div>
           {ordersQuery.isLoading ? (
             <div className="pv-subgrid">
               <div className="pv-skeleton" />
@@ -263,14 +341,87 @@ export default function OrdersPage() {
               tone="error"
               message={webApi.getApiErrorMessage(ordersQuery.error, 'Unable to load conditional orders')}
             />
-          ) : (
-            <ConditionalOrderList
-              orders={orders}
-              cancellingOrderId={cancelMutation.isPending ? cancelMutation.variables : null}
-              onCancel={(orderId) => {
-                void cancelMutation.mutateAsync(orderId);
-              }}
+          ) : !visibleOrders.length ? (
+            <InlineNotice
+              tone="info"
+              message={
+                orderFilter === 'all'
+                  ? 'No conditional orders yet.'
+                  : `No ${orderFilter === 'active' ? 'active' : 'terminal'} conditional orders match this filter right now.`
+              }
             />
+          ) : (
+            <div className={`pv-workspace-table seven-column ${density}`}>
+              <div className="pv-workspace-header">
+                <span>Order</span>
+                <span>Status</span>
+                <span>Target</span>
+                <span>Last checked</span>
+                <span>Triggered</span>
+                <span>Created</span>
+                <span className="actions">Actions</span>
+              </div>
+              {visibleOrders.map((order) => {
+                const failureSummary = conditionalOrderFailureSummary(order);
+                const tone = conditionalOrderStatusTone(order.status);
+
+                return (
+                  <div className={`pv-workspace-row ${density}`} key={order.id}>
+                    <div className="pv-workspace-cell primary">
+                      <span className="pv-list-symbol-line">
+                        <span className="pv-list-symbol">{order.symbol}</span>
+                        <span className={`pv-chip ${order.side === 'BUY' ? 'buy' : 'sell'}`}>{order.side}</span>
+                        <span className={`pv-chip ${tone}`}>{order.status}</span>
+                      </span>
+                      <span className="pv-list-company">
+                        {formatShares(order.quantity)} shares · Execution key {order.executionKey}
+                      </span>
+                      {density === 'comfortable' ? (
+                        <>
+                          <span className="pv-list-meta-line">
+                            <span>Trigger</span>
+                            <span>{order.side === 'BUY' ? 'Market price <= target' : 'Market price >= target'}</span>
+                          </span>
+                          {failureSummary ? <span className="pv-kicker">{failureSummary}</span> : null}
+                        </>
+                      ) : null}
+                    </div>
+                    <div className="pv-workspace-cell">
+                      <span className={`pv-chip ${tone}`}>{order.status}</span>
+                    </div>
+                    <div className="pv-workspace-cell numeric">
+                      <strong>{formatCurrency(order.targetPrice)}</strong>
+                    </div>
+                    <div className="pv-workspace-cell numeric">
+                      <span className="pv-kicker">
+                        {order.lastCheckedPrice == null ? 'Not checked yet' : formatCurrency(order.lastCheckedPrice)}
+                      </span>
+                    </div>
+                    <div className="pv-workspace-cell">
+                      <span className="pv-kicker">{order.triggeredAt ? formatDateTime(order.triggeredAt) : 'Waiting'}</span>
+                    </div>
+                    <div className="pv-workspace-cell">
+                      <span className="pv-kicker">{formatDateTime(order.createdAt)}</span>
+                    </div>
+                    <div className="pv-workspace-cell actions">
+                      {canCancelConditionalOrder(order.status) ? (
+                        <AppButton
+                          variant="ghost"
+                          loading={cancelMutation.isPending && cancelMutation.variables === order.id}
+                          onClick={() => {
+                            void cancelMutation.mutateAsync(order.id);
+                          }}
+                        >
+                          Cancel
+                        </AppButton>
+                      ) : (
+                        <span className="pv-kicker">Locked</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </AppCard>
       </section>
