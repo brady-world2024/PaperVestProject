@@ -1,5 +1,7 @@
 package com.papervest.auth.service;
 
+import com.papervest.analytics.model.ProductAnalyticsEventName;
+import com.papervest.analytics.service.ProductAnalyticsService;
 import com.papervest.auth.dto.AuthResponse;
 import com.papervest.auth.dto.AuthUserResponse;
 import com.papervest.auth.dto.EmailVerificationResultResponse;
@@ -22,6 +24,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Map;
 import java.util.Locale;
 
 @Service
@@ -37,6 +40,7 @@ public class AuthService {
 	private final EmailVerificationService emailVerificationService;
 	private final PasswordResetService passwordResetService;
 	private final AdminBootstrapService adminBootstrapService;
+	private final ProductAnalyticsService productAnalyticsService;
 
 	public AuthService(
 			UserRepository userRepository,
@@ -47,7 +51,8 @@ public class AuthService {
 			PortfolioProperties portfolioProperties,
 			EmailVerificationService emailVerificationService,
 			PasswordResetService passwordResetService,
-			AdminBootstrapService adminBootstrapService
+			AdminBootstrapService adminBootstrapService,
+			ProductAnalyticsService productAnalyticsService
 	) {
 		this.userRepository = userRepository;
 		this.userAccountRepository = userAccountRepository;
@@ -58,6 +63,7 @@ public class AuthService {
 		this.emailVerificationService = emailVerificationService;
 		this.passwordResetService = passwordResetService;
 		this.adminBootstrapService = adminBootstrapService;
+		this.productAnalyticsService = productAnalyticsService;
 	}
 
 	@Transactional
@@ -76,6 +82,11 @@ public class AuthService {
 		));
 		userAccountRepository.save(new UserAccount(user.getId(), portfolioProperties.initialCash()));
 		emailVerificationService.issueForUser(user);
+		recordAnalyticsBestEffort(
+				user,
+				ProductAnalyticsEventName.USER_REGISTERED,
+				Map.of("role", user.getRole().name())
+		);
 		log.info(
 				"User registered userId={} email={} initialCash={} deviceName={}",
 				user.getId(),
@@ -108,6 +119,11 @@ public class AuthService {
 				normalizeDeviceName(request.deviceName())
 		);
 		adminBootstrapService.ensureBootstrapRole(user);
+		recordAnalyticsBestEffort(
+				user,
+				ProductAnalyticsEventName.USER_LOGGED_IN,
+				Map.of("role", user.getRole().name())
+		);
 		return issueSession(user, request.deviceName());
 	}
 
@@ -198,5 +214,19 @@ public class AuthService {
 			return "***";
 		}
 		return email.charAt(0) + "***" + email.substring(atIndex);
+	}
+
+	private void recordAnalyticsBestEffort(User user, ProductAnalyticsEventName eventName, Map<String, Object> metadata) {
+		try {
+			productAnalyticsService.trackDomainEvent(user.getId(), eventName, metadata);
+		}
+		catch (RuntimeException ex) {
+			log.warn(
+					"Product analytics recording skipped userId={} event={} reason={}",
+					user.getId(),
+					eventName,
+					ex.getMessage()
+			);
+		}
 	}
 }

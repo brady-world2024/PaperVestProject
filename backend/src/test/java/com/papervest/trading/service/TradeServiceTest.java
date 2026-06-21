@@ -1,5 +1,7 @@
 package com.papervest.trading.service;
 
+import com.papervest.analytics.model.ProductAnalyticsEventName;
+import com.papervest.analytics.service.ProductAnalyticsService;
 import com.papervest.common.exception.InvalidTradeException;
 import com.papervest.marketdata.model.MarketSessionState;
 import com.papervest.marketdata.model.StockQuote;
@@ -60,6 +62,9 @@ class TradeServiceTest {
 	private PortfolioHistoryService portfolioHistoryService;
 
 	@Mock
+	private ProductAnalyticsService productAnalyticsService;
+
+	@Mock
 	private TransactionStatus transactionStatus;
 
 	private TradeService tradeService;
@@ -73,6 +78,7 @@ class TradeServiceTest {
 				tradeRepository,
 				marketDataService,
 				portfolioHistoryService,
+				productAnalyticsService,
 				transactionManager
 		);
 	}
@@ -100,6 +106,7 @@ class TradeServiceTest {
 		assertThat(response.grossAmount()).isEqualByComparingTo("1000.00");
 		assertThat(response.side().name()).isEqualTo("BUY");
 		verify(portfolioHistoryService).recordTradeExecutionSnapshot(eq(userId), any());
+		verify(productAnalyticsService).trackDomainEvent(eq(userId), eq(ProductAnalyticsEventName.TRADE_EXECUTED), any());
 	}
 
 	@Test

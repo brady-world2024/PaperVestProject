@@ -131,6 +131,27 @@ export type HomeMarketResponse = {
   degraded: boolean;
 };
 
+export type ProductAnalyticsWindowDays = 7 | 30 | 90;
+
+export type ProductAnalyticsEventName =
+  | 'PAGE_VIEWED'
+  | 'STOCK_SEARCH_PERFORMED'
+  | 'USER_REGISTERED'
+  | 'USER_LOGGED_IN'
+  | 'WATCHLIST_ITEM_ADDED'
+  | 'WATCHLIST_ITEM_REMOVED'
+  | 'TRADE_EXECUTED'
+  | 'CONDITIONAL_ORDER_CREATED'
+  | 'CONDITIONAL_ORDER_CANCELLED';
+
+export type ProductAnalyticsEventSource = 'WEB_APP' | 'BACKEND_DOMAIN';
+
+export type TrackProductAnalyticsEventPayload = {
+  eventName: ProductAnalyticsEventName;
+  path?: string | null;
+  metadata?: Record<string, unknown>;
+};
+
 export type StockSearchResult = {
   symbol: string;
   companyName: string;
@@ -454,4 +475,60 @@ export type SupportUserDetailResponse = {
   recentTrades: TradeExecutionResponse[];
   activeConditionalOrders: ConditionalOrder[];
   recentNotifications: UserNotification[];
+};
+
+export type ProductAnalyticsSummary = {
+  totalEvents: number;
+  uniqueUsers: number;
+  pageViews: number;
+  stockSearches: number;
+  registrations: number;
+  logins: number;
+  tradesExecuted: number;
+  conditionalOrdersCreated: number;
+  conditionalOrdersCancelled: number;
+  watchlistAdds: number;
+  watchlistRemovals: number;
+};
+
+export type ProductAnalyticsDailyActivityPoint = {
+  day: string;
+  totalEvents: number;
+  uniqueUsers: number;
+  pageViews: number;
+  stockSearches: number;
+  registrations: number;
+  logins: number;
+  tradesExecuted: number;
+  conditionalOrdersCreated: number;
+};
+
+export type ProductAnalyticsTopPage = {
+  path: string;
+  views: number;
+};
+
+export type ProductAnalyticsEventBreakdownEntry = {
+  eventName: ProductAnalyticsEventName;
+  count: number;
+};
+
+export type ProductAnalyticsFunnel = {
+  usersSeen: number;
+  usersWithPageViews: number;
+  usersWithSearches: number;
+  usersWithWatchlistActivity: number;
+  usersWithTrades: number;
+  usersWithConditionalOrders: number;
+};
+
+export type ProductAnalyticsOverviewResponse = {
+  windowDays: ProductAnalyticsWindowDays;
+  from: string;
+  to: string;
+  summary: ProductAnalyticsSummary;
+  dailyActivity: ProductAnalyticsDailyActivityPoint[];
+  topPages: ProductAnalyticsTopPage[];
+  eventBreakdown: ProductAnalyticsEventBreakdownEntry[];
+  funnel: ProductAnalyticsFunnel;
 };

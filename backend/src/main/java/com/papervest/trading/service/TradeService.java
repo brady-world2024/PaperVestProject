@@ -1,5 +1,7 @@
 package com.papervest.trading.service;
 
+import com.papervest.analytics.model.ProductAnalyticsEventName;
+import com.papervest.analytics.service.ProductAnalyticsService;
 import com.papervest.common.exception.InsufficientFundsException;
 import com.papervest.common.exception.InvalidTradeException;
 import com.papervest.common.exception.ResourceNotFoundException;
@@ -27,6 +29,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -39,6 +42,7 @@ public class TradeService {
 	private final TradeRepository tradeRepository;
 	private final MarketDataService marketDataService;
 	private final PortfolioHistoryService portfolioHistoryService;
+	private final ProductAnalyticsService productAnalyticsService;
 	private final TransactionTemplate transactionTemplate;
 
 	public TradeService(
@@ -47,6 +51,7 @@ public class TradeService {
 			TradeRepository tradeRepository,
 			MarketDataService marketDataService,
 			PortfolioHistoryService portfolioHistoryService,
+			ProductAnalyticsService productAnalyticsService,
 			PlatformTransactionManager transactionManager
 	) {
 		this.userAccountRepository = userAccountRepository;
@@ -54,6 +59,7 @@ public class TradeService {
 		this.tradeRepository = tradeRepository;
 		this.marketDataService = marketDataService;
 		this.portfolioHistoryService = portfolioHistoryService;
+		this.productAnalyticsService = productAnalyticsService;
 		this.transactionTemplate = new TransactionTemplate(transactionManager);
 	}
 
@@ -299,6 +305,16 @@ public class TradeService {
 				account.getCashBalance()
 		);
 		recordPortfolioSnapshotBestEffort(userId, trade.getExecutedAt());
+		recordAnalyticsBestEffort(
+				userId,
+				ProductAnalyticsEventName.TRADE_EXECUTED,
+				Map.of(
+						"symbol", symbol,
+						"side", side.name(),
+						"quantity", quantity,
+						"grossAmount", grossAmount
+				)
+		);
 
 		return toResponse(trade, false);
 	}
@@ -312,6 +328,20 @@ public class TradeService {
 					"Portfolio snapshot recording skipped userId={} capturedAt={} reason={}",
 					userId,
 					capturedAt,
+					ex.getMessage()
+			);
+		}
+	}
+
+	private void recordAnalyticsBestEffort(UUID userId, ProductAnalyticsEventName eventName, Map<String, Object> metadata) {
+		try {
+			productAnalyticsService.trackDomainEvent(userId, eventName, metadata);
+		}
+		catch (RuntimeException ex) {
+			log.warn(
+					"Product analytics recording skipped userId={} event={} reason={}",
+					userId,
+					eventName,
 					ex.getMessage()
 			);
 		}

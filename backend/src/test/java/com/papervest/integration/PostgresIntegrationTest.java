@@ -54,6 +54,16 @@ class PostgresIntegrationTest extends AbstractContainerIntegrationTest {
 					""",
 				String.class
 		);
+		String analyticsMetadataColumnType = jdbcTemplate.queryForObject(
+				"""
+					select udt_name
+					from information_schema.columns
+					where table_schema = 'public'
+					  and table_name = 'product_analytics_events'
+					  and column_name = 'metadata_json'
+					""",
+				String.class
+		);
 		Integer executionKeyIndexes = jdbcTemplate.queryForObject(
 				"""
 					select count(*)
@@ -114,15 +124,38 @@ class PostgresIntegrationTest extends AbstractContainerIntegrationTest {
 					""",
 				Integer.class
 		);
+		Integer productAnalyticsUserIndexes = jdbcTemplate.queryForObject(
+				"""
+					select count(*)
+					from pg_indexes
+					where schemaname = 'public'
+					  and tablename = 'product_analytics_events'
+					  and indexname = 'ix_product_analytics_events_user_id_created_at'
+					""",
+				Integer.class
+		);
+		Integer productAnalyticsEventIndexes = jdbcTemplate.queryForObject(
+				"""
+					select count(*)
+					from pg_indexes
+					where schemaname = 'public'
+					  and tablename = 'product_analytics_events'
+					  and indexname = 'ix_product_analytics_events_event_name_created_at'
+					""",
+				Integer.class
+		);
 
-		assertThat(appliedMigrations).isEqualTo(5);
+		assertThat(appliedMigrations).isEqualTo(7);
 		assertThat(metadataColumnType).isEqualTo("jsonb");
+		assertThat(analyticsMetadataColumnType).isEqualTo("jsonb");
 		assertThat(executionKeyIndexes).isEqualTo(1);
 		assertThat(schedulerIndexes).isEqualTo(1);
 		assertThat(emailTokenIndexes).isEqualTo(1);
 		assertThat(passwordResetTokenIndexes).isEqualTo(1);
 		assertThat(portfolioSnapshotIndexes).isEqualTo(1);
 		assertThat(userNotificationIndexes).isEqualTo(1);
+		assertThat(productAnalyticsUserIndexes).isEqualTo(1);
+		assertThat(productAnalyticsEventIndexes).isEqualTo(1);
 	}
 
 	@Test

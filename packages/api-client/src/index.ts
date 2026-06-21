@@ -2,6 +2,9 @@ import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'ax
 
 import type {
   AccountProfile,
+  ProductAnalyticsOverviewResponse,
+  ProductAnalyticsWindowDays,
+  TrackProductAnalyticsEventPayload,
   SupportUserDetailResponse,
   SupportUserListResponse,
   ApiErrorResponse,
@@ -290,6 +293,18 @@ export function createPapervestApiClient({
     async getSupportUserDetail(userId: string) {
       const { data } = await apiClient.get<SupportUserDetailResponse>(`/admin/support/users/${userId}`);
       return data;
+    },
+    async getAdminAnalyticsOverview(days: ProductAnalyticsWindowDays) {
+      const { data } = await apiClient.get<ProductAnalyticsOverviewResponse>('/admin/analytics/overview', {
+        params: { days },
+      });
+      return data;
+    },
+    async trackProductAnalyticsEvent(payload: TrackProductAnalyticsEventPayload) {
+      const previousCookieToken = resolveCookieCsrfToken();
+      await ensureCookieCsrfToken();
+      await apiClient.post('/analytics/events', payload, buildCookieWriteConfig());
+      await stabilizeCookieCsrfToken(previousCookieToken);
     },
     async changePassword(payload: ChangePasswordPayload) {
       const previousCookieToken = resolveCookieCsrfToken();

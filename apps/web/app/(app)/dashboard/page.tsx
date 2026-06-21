@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useDeferredValue, useState } from 'react';
+import { useDeferredValue, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getMarketSessionPresentation } from '@papervest/shared-types';
 
@@ -30,6 +30,7 @@ import { getMarketSessionChipClass } from '@/lib/market-session';
 export default function DashboardPage() {
   const [searchText, setSearchText] = useState('');
   const deferredSearch = useDeferredValue(searchText.trim());
+  const lastTrackedSearchRef = useRef<string | null>(null);
 
   const homeQuery = useQuery({
     queryKey: queryKeys.home,
@@ -65,6 +66,27 @@ export default function DashboardPage() {
   const watchlistItems = watchlistQuery.data?.items ?? [];
   const recentTrades = historyQuery.data?.trades.slice(0, 4) ?? [];
   const degradedHomeMarketMessage = getDegradedHomeMarketMessage(homeQuery.data?.degraded ?? false);
+
+  useEffect(() => {
+    if (!deferredSearch || !searchQuery.isSuccess || !searchQuery.data) {
+      return;
+    }
+
+    const trackingKey = `${deferredSearch.toLowerCase()}:${searchQuery.data.results.length}`;
+    if (lastTrackedSearchRef.current === trackingKey) {
+      return;
+    }
+
+    lastTrackedSearchRef.current = trackingKey;
+    void webApi.trackProductAnalyticsEvent({
+      eventName: 'STOCK_SEARCH_PERFORMED',
+      path: '/dashboard',
+      metadata: {
+        queryLength: deferredSearch.length,
+        resultsCount: searchQuery.data.results.length,
+      },
+    });
+  }, [deferredSearch, searchQuery.data, searchQuery.isSuccess]);
 
   return (
     <main className="pv-page pv-stack">

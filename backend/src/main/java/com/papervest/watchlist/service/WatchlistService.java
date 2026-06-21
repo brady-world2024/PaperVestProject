@@ -1,5 +1,7 @@
 package com.papervest.watchlist.service;
 
+import com.papervest.analytics.model.ProductAnalyticsEventName;
+import com.papervest.analytics.service.ProductAnalyticsService;
 import com.papervest.common.exception.ConflictException;
 import com.papervest.common.exception.ResourceNotFoundException;
 import com.papervest.common.util.SymbolUtils;
@@ -26,10 +28,16 @@ public class WatchlistService {
 	private static final Logger log = LoggerFactory.getLogger(WatchlistService.class);
 	private final WatchlistItemRepository watchlistItemRepository;
 	private final MarketDataService marketDataService;
+	private final ProductAnalyticsService productAnalyticsService;
 
-	public WatchlistService(WatchlistItemRepository watchlistItemRepository, MarketDataService marketDataService) {
+	public WatchlistService(
+			WatchlistItemRepository watchlistItemRepository,
+			MarketDataService marketDataService,
+			ProductAnalyticsService productAnalyticsService
+	) {
 		this.watchlistItemRepository = watchlistItemRepository;
 		this.marketDataService = marketDataService;
+		this.productAnalyticsService = productAnalyticsService;
 	}
 
 	@Transactional(readOnly = true)
@@ -61,6 +69,7 @@ public class WatchlistService {
 
 		StockQuote quote = marketDataService.getQuote(symbol, request.companyName());
 		WatchlistItem item = watchlistItemRepository.save(new WatchlistItem(userId, symbol, quote.companyName()));
+		recordAnalyticsBestEffort(userId, ProductAnalyticsEventName.WATCHLIST_ITEM_ADDED, Map.of("symbol", symbol));
 		log.info("Watchlist item added userId={} symbol={} companyName={}", userId, symbol, quote.companyName());
 		return toResponse(item, quote);
 	}
@@ -72,8 +81,9 @@ public class WatchlistService {
 				.orElseThrow(() -> {
 					log.warn("Watchlist remove rejected userId={} symbol={} reason=item_not_found", userId, normalizedSymbol);
 					return new ResourceNotFoundException("WATCHLIST_ITEM_NOT_FOUND", "Watchlist item could not be found");
-				});
+		});
 		watchlistItemRepository.delete(item);
+		recordAnalyticsBestEffort(userId, ProductAnalyticsEventName.WATCHLIST_ITEM_REMOVED, Map.of("symbol", item.getSymbol()));
 		log.info("Watchlist item removed userId={} symbol={}", userId, item.getSymbol());
 	}
 
@@ -91,5 +101,19 @@ public class WatchlistService {
 				quote == null ? null : quote.marketTimezone(),
 				item.getCreatedAt()
 		);
+	}
+
+	private void recordAnalyticsBestEffort(UUID userId, ProductAnalyticsEventName eventName, Map<String, Object> metadata) {
+		try {
+			productAnalyticsService.trackDomainEvent(userId, eventName, metadata);
+		}
+		catch (RuntimeException ex) {
+			log.warn(
+					"Product analytics recording skipped userId={} event={} reason={}",
+					userId,
+					eventName,
+					ex.getMessage()
+			);
+		}
 	}
 }

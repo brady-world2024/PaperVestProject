@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { usePathname } from 'next/navigation';
-import type { ReactNode } from 'react';
+import { type ReactNode, useEffect, useRef } from 'react';
 
 import { AppButton } from './app-button';
 import { BrandLogo } from './brand-logo';
@@ -19,6 +19,7 @@ const navItems = [
   { href: '/portfolio', label: 'Portfolio', meta: 'Holdings + P&L' },
   { href: '/activity', label: 'Activity', meta: 'Trade ledger' },
   { href: '/account', label: 'Account', meta: 'Security + lifecycle' },
+  { href: '/admin/analytics', label: 'Analytics', meta: 'Usage + adoption signals', adminOnly: true },
   { href: '/admin/support', label: 'Support', meta: 'Admin support console', adminOnly: true },
 ];
 
@@ -59,6 +60,11 @@ const pageMeta = [
     description: 'Identity, password rotation, email verification, and lifecycle controls.',
   },
   {
+    match: (pathname: string) => pathname.startsWith('/admin/analytics'),
+    title: 'Product Analytics',
+    description: 'First-party product signals aggregated from browser behavior and backend-owned domain actions.',
+  },
+  {
     match: (pathname: string) => pathname.startsWith('/admin/support'),
     title: 'Support Console',
     description: 'Admin-only user lookup for account state, sessions, orders, notifications, and recent trading context.',
@@ -75,6 +81,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
   const signOut = useAuthStore((state) => state.signOut);
+  const lastTrackedPageViewRef = useRef<string | null>(null);
   const currentPage = pageMeta.find((entry) => entry.match(pathname));
   const notificationsQuery = useQuery({
     queryKey: queryKeys.notifications,
@@ -90,8 +97,26 @@ export function AppShell({ children }: { children: ReactNode }) {
     { href: '/orders', label: 'Conditional orders' },
     { href: '/portfolio', label: 'Portfolio' },
     { href: '/account', label: 'Account' },
+    ...(user?.role === 'ADMIN' ? [{ href: '/admin/analytics', label: 'Product analytics' }] : []),
     ...(user?.role === 'ADMIN' ? [{ href: '/admin/support', label: 'Support console' }] : []),
   ];
+
+  useEffect(() => {
+    if (!user?.id) {
+      return;
+    }
+
+    const trackingKey = `${user.id}:${pathname}`;
+    if (lastTrackedPageViewRef.current === trackingKey) {
+      return;
+    }
+
+    lastTrackedPageViewRef.current = trackingKey;
+    void webApi.trackProductAnalyticsEvent({
+      eventName: 'PAGE_VIEWED',
+      path: pathname,
+    });
+  }, [pathname, user?.id]);
 
   return (
     <div className="pv-app-shell">

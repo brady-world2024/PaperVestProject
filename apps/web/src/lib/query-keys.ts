@@ -1,5 +1,6 @@
 export const queryKeys = {
   accountProfile: ['account-profile'] as const,
+  adminAnalyticsOverview: (days: number) => ['admin-analytics-overview', days] as const,
   adminSupportUsers: (query: string) => ['admin-support-users', query] as const,
   adminSupportUser: (userId: string) => ['admin-support-user', userId] as const,
   home: ['home-market'] as const,

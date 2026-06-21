@@ -2,6 +2,8 @@ package com.papervest.conditionalorder.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.papervest.analytics.model.ProductAnalyticsEventName;
+import com.papervest.analytics.service.ProductAnalyticsService;
 import com.papervest.common.exception.ConflictException;
 import com.papervest.common.exception.ResourceNotFoundException;
 import com.papervest.common.util.SymbolUtils;
@@ -35,6 +37,7 @@ public class ConditionalOrderService {
 	private final ConditionalOrderRepository conditionalOrderRepository;
 	private final ConditionalOrderStatusEventRepository statusEventRepository;
 	private final ConditionalOrderTransitionService transitionService;
+	private final ProductAnalyticsService productAnalyticsService;
 	private final ObjectMapper objectMapper;
 	private final Clock clock;
 
@@ -42,12 +45,14 @@ public class ConditionalOrderService {
 			ConditionalOrderRepository conditionalOrderRepository,
 			ConditionalOrderStatusEventRepository statusEventRepository,
 			ConditionalOrderTransitionService transitionService,
+			ProductAnalyticsService productAnalyticsService,
 			ObjectMapper objectMapper,
 			Clock clock
 	) {
 		this.conditionalOrderRepository = conditionalOrderRepository;
 		this.statusEventRepository = statusEventRepository;
 		this.transitionService = transitionService;
+		this.productAnalyticsService = productAnalyticsService;
 		this.objectMapper = objectMapper;
 		this.clock = clock;
 	}
@@ -67,6 +72,16 @@ public class ConditionalOrderService {
 				request.expiresAt()
 		));
 		transitionService.recordCreated(order);
+		recordAnalyticsBestEffort(
+				userId,
+				ProductAnalyticsEventName.CONDITIONAL_ORDER_CREATED,
+				Map.of(
+						"symbol", order.getSymbol(),
+						"side", order.getSide().name(),
+						"quantity", order.getQuantity(),
+						"targetPrice", order.getTargetPrice()
+				)
+		);
 		log.info(
 				"Conditional order created orderId={} userId={} symbol={} side={} targetPrice={} quantity={} executionKey={}",
 				order.getId(),
@@ -109,6 +124,15 @@ public class ConditionalOrderService {
 		if (!transitionService.cancel(order)) {
 			throw new ConflictException("ORDER_NOT_ACTIVE", "This conditional order is no longer active");
 		}
+		recordAnalyticsBestEffort(
+				userId,
+				ProductAnalyticsEventName.CONDITIONAL_ORDER_CANCELLED,
+				Map.of(
+						"symbol", order.getSymbol(),
+						"side", order.getSide().name(),
+						"status", order.getStatus().name()
+				)
+		);
 		log.info("Conditional order cancelled orderId={} userId={}", orderId, userId);
 		return detail(userId, orderId).order();
 	}
@@ -176,6 +200,20 @@ public class ConditionalOrderService {
 		}
 		catch (IOException ex) {
 			return Map.of("raw", metadataJson);
+		}
+	}
+
+	private void recordAnalyticsBestEffort(UUID userId, ProductAnalyticsEventName eventName, Map<String, Object> metadata) {
+		try {
+			productAnalyticsService.trackDomainEvent(userId, eventName, metadata);
+		}
+		catch (RuntimeException ex) {
+			log.warn(
+					"Product analytics recording skipped userId={} event={} reason={}",
+					userId,
+					eventName,
+					ex.getMessage()
+			);
 		}
 	}
 }
