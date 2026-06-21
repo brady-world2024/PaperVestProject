@@ -3,6 +3,7 @@ export type DashboardModuleId =
   | 'watchlist'
   | 'activity'
   | 'marketBoard'
+  | 'decisionSupport'
   | 'nextActions'
   | 'exposure'
   | 'activeOrders'
@@ -50,6 +51,12 @@ const moduleMeta: Record<DashboardModuleId, DashboardModuleMeta> = {
     shortLabel: 'Market board',
     description: 'Scan the home market symbols and quote freshness.',
   },
+  decisionSupport: {
+    id: 'decisionSupport',
+    label: 'Decision support',
+    shortLabel: 'Decision support',
+    description: 'Surface the highest-value signals before the next trade.',
+  },
   nextActions: {
     id: 'nextActions',
     label: 'Next actions',
@@ -82,6 +89,7 @@ const balancedLayout: DashboardModulePreference[] = [
   { id: 'activity', column: 'primary', visible: true, collapsed: false },
   { id: 'marketBoard', column: 'primary', visible: true, collapsed: false },
   { id: 'nextActions', column: 'secondary', visible: true, collapsed: false },
+  { id: 'decisionSupport', column: 'secondary', visible: true, collapsed: false },
   { id: 'exposure', column: 'secondary', visible: true, collapsed: false },
   { id: 'activeOrders', column: 'secondary', visible: true, collapsed: false },
   { id: 'holdingsPulse', column: 'secondary', visible: true, collapsed: false },
@@ -94,6 +102,7 @@ const presetLayouts: Record<DashboardWorkspacePreset, DashboardModulePreference[
     { id: 'watchlist', column: 'primary', visible: true, collapsed: false },
     { id: 'history', column: 'primary', visible: true, collapsed: false },
     { id: 'activity', column: 'primary', visible: true, collapsed: true },
+    { id: 'decisionSupport', column: 'primary', visible: true, collapsed: false },
     { id: 'nextActions', column: 'secondary', visible: true, collapsed: false },
     { id: 'exposure', column: 'secondary', visible: true, collapsed: false },
     { id: 'activeOrders', column: 'secondary', visible: true, collapsed: false },
@@ -103,6 +112,7 @@ const presetLayouts: Record<DashboardWorkspacePreset, DashboardModulePreference[
     { id: 'history', column: 'primary', visible: true, collapsed: true },
     { id: 'activity', column: 'primary', visible: true, collapsed: false },
     { id: 'marketBoard', column: 'primary', visible: true, collapsed: false },
+    { id: 'decisionSupport', column: 'primary', visible: true, collapsed: false },
     { id: 'watchlist', column: 'primary', visible: true, collapsed: false },
     { id: 'nextActions', column: 'secondary', visible: true, collapsed: false },
     { id: 'activeOrders', column: 'secondary', visible: true, collapsed: false },

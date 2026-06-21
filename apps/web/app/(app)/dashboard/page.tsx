@@ -28,6 +28,7 @@ import {
 } from '@/lib/dashboard-workspace';
 import {
   getActiveCommandCenterOrders,
+  getCommandCenterDecisionSupport,
   getCommandCenterExposureSummary,
   getCommandCenterMarketSummary,
   getCommandCenterNextActions,
@@ -110,6 +111,13 @@ export default function DashboardPage() {
     watchlistItems,
     activeConditionalOrders,
     marketSummary,
+  });
+  const decisionSignals = getCommandCenterDecisionSupport({
+    summary,
+    holdings,
+    watchlistItems,
+    activeConditionalOrders,
+    recentTrades,
   });
   const primaryModules = getDashboardModulesForColumn(
     dashboardWorkspace.preferences,
@@ -421,6 +429,25 @@ export default function DashboardPage() {
                   <span className="pv-next-action-title">{action.title}</span>
                   <span className="pv-next-action-copy">{action.description}</span>
                   <span className="pv-next-action-link">{action.label}</span>
+                </Link>
+              ))}
+            </div>
+          </DashboardModuleCard>
+        );
+      case 'decisionSupport':
+        return (
+          <DashboardModuleCard key={preference.id} {...commonProps}>
+            <div className="pv-decision-support-grid">
+              {decisionSignals.map((signal) => (
+                <Link
+                  key={signal.id}
+                  className={`pv-decision-card ${signal.tone}`}
+                  href={signal.href}
+                >
+                  <span className="pv-decision-label">{signal.title}</span>
+                  <strong className="pv-decision-metric">{signal.metric}</strong>
+                  <span className="pv-decision-copy">{signal.description}</span>
+                  <span className="pv-decision-link">{signal.label}</span>
                 </Link>
               ))}
             </div>

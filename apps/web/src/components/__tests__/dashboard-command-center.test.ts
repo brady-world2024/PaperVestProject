@@ -10,11 +10,13 @@ import type {
 } from '@papervest/shared-types';
 
 import {
+  getCommandCenterDecisionSupport,
   getActiveCommandCenterOrders,
   getCommandCenterExposureSummary,
   getCommandCenterMarketSummary,
   getCommandCenterNextActions,
 } from '../../lib/dashboard-command-center';
+import type { TradeExecutionResponse } from '@papervest/shared-types';
 
 const sampleSummary: PortfolioSummary = {
   initialCash: 100000,
@@ -120,6 +122,35 @@ const sampleQuotes: Quote[] = [
   },
 ];
 
+const sampleTrades: TradeExecutionResponse[] = [
+  {
+    tradeId: 'trade-1',
+    symbol: 'AAPL',
+    companyName: 'Apple Inc.',
+    side: 'SELL',
+    quantity: 5,
+    executedPrice: 170,
+    grossAmount: 850,
+    realizedPnl: 100,
+    cashBalanceAfterTrade: 40850,
+    executedAt: '2026-06-21T12:00:00Z',
+    idempotentReplay: false,
+  },
+  {
+    tradeId: 'trade-2',
+    symbol: 'NVDA',
+    companyName: 'NVIDIA Corporation',
+    side: 'BUY',
+    quantity: 3,
+    executedPrice: 118,
+    grossAmount: 354,
+    realizedPnl: 0,
+    cashBalanceAfterTrade: 40496,
+    executedAt: '2026-06-21T11:00:00Z',
+    idempotentReplay: false,
+  },
+];
+
 test('exposure summary derives allocation and concentration from portfolio data', () => {
   const summary = getCommandCenterExposureSummary(sampleSummary, sampleHoldings);
 
@@ -177,4 +208,34 @@ test('market summary reports live regular session when tradable quotes are open'
   assert.equal(summary.label, 'Regular session live');
   assert.equal(summary.chip, 'Live');
   assert.equal(summary.marketClosed, false);
+});
+
+test('decision support surfaces mover, protection gap, and execution pulse', () => {
+  const signals = getCommandCenterDecisionSupport({
+    summary: sampleSummary,
+    holdings: sampleHoldings,
+    watchlistItems: sampleWatchlist,
+    activeConditionalOrders: [],
+    recentTrades: sampleTrades,
+  });
+
+  assert.equal(signals[0]?.id, 'watchlist-mover');
+  assert.ok(signals.some((signal) => signal.id === 'protection-gap'));
+  assert.ok(signals.some((signal) => signal.id === 'execution-pulse'));
+});
+
+test('decision support reports automation coverage when holdings are already protected', () => {
+  const signals = getCommandCenterDecisionSupport({
+    summary: sampleSummary,
+    holdings: sampleHoldings,
+    watchlistItems: sampleWatchlist,
+    activeConditionalOrders: [
+      activeOrder,
+      { ...activeOrder, id: 'order-2', symbol: 'NVDA' },
+    ],
+    recentTrades: sampleTrades,
+  });
+
+  assert.ok(signals.some((signal) => signal.id === 'protected-book'));
+  assert.equal(signals.some((signal) => signal.id === 'protection-gap'), false);
 });

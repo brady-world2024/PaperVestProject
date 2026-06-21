@@ -19,7 +19,7 @@ test('dashboard workspace returns ordered visible modules by column', () => {
   const secondary = getDashboardModulesForColumn(workspace, 'secondary');
 
   assert.deepEqual(primary.map((module) => module.id), ['history', 'watchlist', 'activity', 'marketBoard']);
-  assert.deepEqual(secondary.map((module) => module.id), ['nextActions', 'exposure', 'activeOrders', 'holdingsPulse']);
+  assert.deepEqual(secondary.map((module) => module.id), ['nextActions', 'decisionSupport', 'exposure', 'activeOrders', 'holdingsPulse']);
 });
 
 test('dashboard workspace can hide and restore modules', () => {
@@ -48,7 +48,7 @@ test('dashboard workspace can reorder within a column and move across columns', 
   const movedAcross = moveDashboardModuleToColumn(movedUp, 'marketBoard', 'secondary');
   assert.deepEqual(
     getDashboardModulesForColumn(movedAcross, 'secondary').map((module) => module.id),
-    ['nextActions', 'exposure', 'activeOrders', 'holdingsPulse', 'marketBoard']
+    ['nextActions', 'decisionSupport', 'exposure', 'activeOrders', 'holdingsPulse', 'marketBoard']
   );
 });
 
@@ -62,6 +62,10 @@ test('dashboard workspace presets keep current visibility but change order and c
   assert.deepEqual(
     getDashboardModulesForColumn(execution, 'secondary').map((module) => module.id),
     ['nextActions', 'activeOrders', 'holdingsPulse', 'exposure']
+  );
+  assert.deepEqual(
+    getDashboardModulesForColumn(execution, 'primary').map((module) => module.id),
+    ['activity', 'marketBoard', 'decisionSupport', 'watchlist']
   );
 });
 
