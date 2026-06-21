@@ -42,13 +42,20 @@ import {
   formatSignedCurrency,
 } from '@/lib/formatters';
 import { webApi } from '@/lib/api';
+import {
+  formatRelativeRefreshTime,
+  getLatestTimestamp,
+  getLiveFeedbackStatus,
+} from '@/lib/live-feedback';
 import { getDegradedHomeMarketMessage, getStaleQuoteBadge, getStaleQuoteMessage } from '@/lib/market-data-freshness';
-import { liveQuoteRefreshOptions } from '@/lib/market-data-refresh';
+import { liveQuoteRefreshOptions, QUOTE_AUTO_REFRESH_INTERVAL_MS } from '@/lib/market-data-refresh';
 import { getMarketSessionChipClass } from '@/lib/market-session';
 import { queryKeys } from '@/lib/query-keys';
+import { useLiveNow } from '@/lib/use-live-now';
 import { useDashboardWorkspace } from '@/lib/use-dashboard-workspace';
 
 export default function DashboardPage() {
+  const now = useLiveNow();
   const [searchText, setSearchText] = useState('');
   const [historyRange, setHistoryRange] = useState<PortfolioHistoryRange>('1M');
   const deferredSearch = useDeferredValue(searchText.trim());
@@ -96,16 +103,16 @@ export default function DashboardPage() {
     enabled: deferredSearch.length > 0,
   });
 
+  const homeQuotes = homeQuery.data?.quotes ?? [];
+  const homeDegraded = homeQuery.data?.degraded ?? false;
+  const portfolioHistoryPoints = portfolioHistoryQuery.data?.points ?? [];
   const summary = portfolioQuery.data?.summary;
   const holdings = portfolioQuery.data?.holdings ?? [];
   const watchlistItems = watchlistQuery.data?.items ?? [];
   const recentTrades = historyQuery.data?.trades.slice(0, 4) ?? [];
   const activeConditionalOrders = getActiveCommandCenterOrders(conditionalOrdersQuery.data?.orders ?? []);
   const exposureSummary = getCommandCenterExposureSummary(summary, holdings);
-  const marketSummary = getCommandCenterMarketSummary(
-    homeQuery.data?.quotes ?? [],
-    homeQuery.data?.degraded ?? false
-  );
+  const marketSummary = getCommandCenterMarketSummary(homeQuotes, homeDegraded);
   const nextActions = getCommandCenterNextActions({
     holdings,
     watchlistItems,
@@ -131,7 +138,76 @@ export default function DashboardPage() {
   const topExposureHoldings = [...holdings]
     .sort((left, right) => right.marketValue - left.marketValue)
     .slice(0, 3);
-  const degradedHomeMarketMessage = getDegradedHomeMarketMessage(homeQuery.data?.degraded ?? false);
+  const degradedHomeMarketMessage = getDegradedHomeMarketMessage(homeDegraded);
+  const liveRefreshInFlight =
+    homeQuery.isFetching ||
+    portfolioQuery.isFetching ||
+    portfolioHistoryQuery.isFetching ||
+    watchlistQuery.isFetching ||
+    conditionalOrdersQuery.isFetching;
+  const quoteStalePresent =
+    homeQuotes.some((quote) => quote.stale) ||
+    watchlistItems.some((item) => item.staleQuote) ||
+    holdings.some((holding) => holding.staleQuote);
+  const dashboardFeedStatus = getLiveFeedbackStatus({
+    subject: 'command center',
+    timestamps: [
+      ...homeQuotes.map((quote) => quote.quoteTimestamp),
+      ...watchlistItems.map((item) => item.quoteTimestamp),
+      ...holdings.map((holding) => holding.quoteTimestamp),
+      ...portfolioHistoryPoints.map((point) => point.timestamp),
+      ...activeConditionalOrders.map((order) => order.updatedAt ?? order.createdAt),
+      ...recentTrades.map((trade) => trade.executedAt),
+    ],
+    now,
+    refreshIntervalMs: QUOTE_AUTO_REFRESH_INTERVAL_MS,
+    isRefreshing: liveRefreshInFlight,
+    stale: quoteStalePresent,
+    degraded: homeDegraded,
+  });
+  const marketBoardStatus = getLiveFeedbackStatus({
+    subject: 'market board',
+    timestamps: homeQuotes.map((quote) => quote.quoteTimestamp),
+    now,
+    refreshIntervalMs: QUOTE_AUTO_REFRESH_INTERVAL_MS,
+    isRefreshing: homeQuery.isFetching,
+    stale: homeQuotes.some((quote) => quote.stale),
+    degraded: homeDegraded,
+  });
+  const watchlistStatus = getLiveFeedbackStatus({
+    subject: 'watchlist quotes',
+    timestamps: watchlistItems.map((item) => item.quoteTimestamp),
+    now,
+    refreshIntervalMs: QUOTE_AUTO_REFRESH_INTERVAL_MS,
+    isRefreshing: watchlistQuery.isFetching,
+    stale: watchlistItems.some((item) => item.staleQuote),
+  });
+  const holdingsStatus = getLiveFeedbackStatus({
+    subject: 'holdings pulse',
+    timestamps: holdings.map((holding) => holding.quoteTimestamp),
+    now,
+    refreshIntervalMs: QUOTE_AUTO_REFRESH_INTERVAL_MS,
+    isRefreshing: portfolioQuery.isFetching,
+    stale: holdings.some((holding) => holding.staleQuote),
+  });
+  const orderMonitorStatus = getLiveFeedbackStatus({
+    subject: 'conditional order monitor',
+    timestamps: activeConditionalOrders.map((order) => order.updatedAt ?? order.createdAt),
+    now,
+    refreshIntervalMs: QUOTE_AUTO_REFRESH_INTERVAL_MS,
+    isRefreshing: conditionalOrdersQuery.isFetching,
+  });
+  const portfolioHistoryStatus = getLiveFeedbackStatus({
+    subject: 'portfolio history',
+    timestamps: portfolioHistoryQuery.data?.points.map((point) => point.timestamp) ?? [],
+    now,
+    refreshIntervalMs: QUOTE_AUTO_REFRESH_INTERVAL_MS,
+    isRefreshing: portfolioHistoryQuery.isFetching,
+  });
+  const latestTradeTimestamp = getLatestTimestamp(recentTrades.map((trade) => trade.executedAt));
+  const latestTradeRelativeLabel = latestTradeTimestamp
+    ? formatRelativeRefreshTime(latestTradeTimestamp, now)
+    : null;
 
   useEffect(() => {
     if (!deferredSearch || !searchQuery.isSuccess || !searchQuery.data) {
@@ -208,6 +284,20 @@ export default function DashboardPage() {
             key={preference.id}
             {...commonProps}
           >
+            <div className={`pv-live-status-banner ${portfolioHistoryStatus.tone}`}>
+              <div className="pv-live-status-meta">
+                <span className="pv-live-status-chipline">
+                  <span
+                    aria-hidden="true"
+                    className={`pv-live-dot ${portfolioHistoryStatus.pulse ? 'pulse' : ''}`}
+                  />
+                  <strong>{portfolioHistoryStatus.chip}</strong>
+                  <span>{portfolioHistoryStatus.relativeLabel}</span>
+                </span>
+                <span>{portfolioHistoryStatus.detail}</span>
+              </div>
+              <span className="pv-live-status-cadence">{portfolioHistoryStatus.cadenceLabel}</span>
+            </div>
             <PortfolioHistoryChart
               range={historyRange}
               history={portfolioHistoryQuery.data}
@@ -236,6 +326,20 @@ export default function DashboardPage() {
               </AppButtonLink>
             }
           >
+            <div className={`pv-live-status-banner ${watchlistStatus.tone}`}>
+              <div className="pv-live-status-meta">
+                <span className="pv-live-status-chipline">
+                  <span
+                    aria-hidden="true"
+                    className={`pv-live-dot ${watchlistStatus.pulse ? 'pulse' : ''}`}
+                  />
+                  <strong>{watchlistStatus.chip}</strong>
+                  <span>{watchlistStatus.relativeLabel}</span>
+                </span>
+                <span>{watchlistStatus.detail}</span>
+              </div>
+              <span className="pv-live-status-cadence">{watchlistStatus.cadenceLabel}</span>
+            </div>
             {watchlistQuery.isLoading ? (
               <div className="pv-subgrid">
                 <div className="pv-skeleton" />
@@ -408,8 +512,27 @@ export default function DashboardPage() {
                   </div>
                 ) : null}
                 <div className="pv-list">
-                  {homeQuery.data?.quotes.map((quote) => (
-                    <QuoteRow key={quote.symbol} quote={quote} />
+                  <div className={`pv-live-status-banner ${marketBoardStatus.tone}`}>
+                    <div className="pv-live-status-meta">
+                      <span className="pv-live-status-chipline">
+                        <span
+                          aria-hidden="true"
+                          className={`pv-live-dot ${marketBoardStatus.pulse ? 'pulse' : ''}`}
+                        />
+                        <strong>{marketBoardStatus.chip}</strong>
+                        <span>{marketBoardStatus.relativeLabel}</span>
+                      </span>
+                      <span>{marketBoardStatus.detail}</span>
+                    </div>
+                    <span className="pv-live-status-cadence">{marketBoardStatus.cadenceLabel}</span>
+                  </div>
+                  {homeQuotes.map((quote) => (
+                    <QuoteRow
+                      key={quote.symbol}
+                      quote={quote}
+                      now={now}
+                      refreshing={homeQuery.isFetching}
+                    />
                   ))}
                 </div>
               </>
@@ -547,6 +670,20 @@ export default function DashboardPage() {
               </AppButtonLink>
             }
           >
+            <div className={`pv-live-status-banner ${orderMonitorStatus.tone}`}>
+              <div className="pv-live-status-meta">
+                <span className="pv-live-status-chipline">
+                  <span
+                    aria-hidden="true"
+                    className={`pv-live-dot ${orderMonitorStatus.pulse ? 'pulse' : ''}`}
+                  />
+                  <strong>{orderMonitorStatus.chip}</strong>
+                  <span>{orderMonitorStatus.relativeLabel}</span>
+                </span>
+                <span>{orderMonitorStatus.detail}</span>
+              </div>
+              <span className="pv-live-status-cadence">{orderMonitorStatus.cadenceLabel}</span>
+            </div>
             {conditionalOrdersQuery.isLoading ? (
               <div className="pv-subgrid">
                 <div className="pv-skeleton" />
@@ -606,6 +743,20 @@ export default function DashboardPage() {
       case 'holdingsPulse':
         return (
           <DashboardModuleCard key={preference.id} {...commonProps}>
+            <div className={`pv-live-status-banner ${holdingsStatus.tone}`}>
+              <div className="pv-live-status-meta">
+                <span className="pv-live-status-chipline">
+                  <span
+                    aria-hidden="true"
+                    className={`pv-live-dot ${holdingsStatus.pulse ? 'pulse' : ''}`}
+                  />
+                  <strong>{holdingsStatus.chip}</strong>
+                  <span>{holdingsStatus.relativeLabel}</span>
+                </span>
+                <span>{holdingsStatus.detail}</span>
+              </div>
+              <span className="pv-live-status-cadence">{holdingsStatus.cadenceLabel}</span>
+            </div>
             {portfolioQuery.isLoading ? (
               <div className="pv-subgrid">
                 <div className="pv-skeleton" />
@@ -731,18 +882,35 @@ export default function DashboardPage() {
               </strong>
               <span className="pv-command-status-copy">{marketSummary.detail}</span>
             </div>
+            <div className={`pv-command-status-card ${dashboardFeedStatus.tone}`}>
+              <span className="pv-command-status-label">Feed heartbeat</span>
+              <strong className="pv-command-status-value pv-live-value">
+                <span
+                  aria-hidden="true"
+                  className={`pv-live-dot ${dashboardFeedStatus.pulse ? 'pulse' : ''}`}
+                />
+                {dashboardFeedStatus.chip}
+              </strong>
+              <span className="pv-command-status-copy">
+                {dashboardFeedStatus.relativeLabel}. {dashboardFeedStatus.cadenceLabel}
+              </span>
+            </div>
             <div className="pv-command-status-card">
               <span className="pv-command-status-label">Positions open</span>
               <strong className="pv-command-status-value">{holdings.length}</strong>
               <span className="pv-command-status-copy">
-                {holdings.length ? 'Holdings are feeding exposure and P&L in real time.' : 'The account is still all cash.'}
+                {holdings.length
+                  ? `Exposure and P&L are synchronized to ${holdingsStatus.relativeLabel.toLowerCase()}.`
+                  : 'The account is still all cash.'}
               </span>
             </div>
             <div className="pv-command-status-card">
               <span className="pv-command-status-label">Watchlist tracked</span>
               <strong className="pv-command-status-value">{watchlistItems.length}</strong>
               <span className="pv-command-status-copy">
-                {watchlistItems.length ? 'Saved symbols are ready for quote review and trade launch.' : 'No symbols pinned yet.'}
+                {watchlistItems.length
+                  ? `Saved symbols are ready for quote review and trade launch, with the latest read ${watchlistStatus.relativeLabel.toLowerCase()}.`
+                  : 'No symbols pinned yet.'}
               </span>
             </div>
             <div className="pv-command-status-card">
@@ -750,8 +918,10 @@ export default function DashboardPage() {
               <strong className="pv-command-status-value">{activeConditionalOrders.length}</strong>
               <span className="pv-command-status-copy">
                 {activeConditionalOrders.length
-                  ? 'Active conditional orders are still watching market levels.'
-                  : 'No target-price automation is guarding the book yet.'}
+                  ? `Active conditional orders are still watching market levels, last touched ${orderMonitorStatus.relativeLabel.toLowerCase()}.`
+                  : latestTradeRelativeLabel
+                    ? `No target-price automation is guarding the book yet, even though the latest execution landed ${latestTradeRelativeLabel}.`
+                    : 'No target-price automation is guarding the book yet.'}
               </span>
             </div>
           </div>

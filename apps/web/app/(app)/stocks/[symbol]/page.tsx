@@ -11,11 +11,13 @@ import { InlineNotice } from '@/components/inline-notice';
 import { MetricCard } from '@/components/metric-card';
 import { SectionHeader } from '@/components/section-header';
 import { StockHistoryChart } from '@/components/stock-history-chart';
+import { getLiveFeedbackStatus } from '@/lib/live-feedback';
 import { TradeOrderCard } from '@/components/trade-order-card';
 import { getStaleQuoteBadge, getStaleQuoteMessage } from '@/lib/market-data-freshness';
-import { liveQuoteRefreshOptions } from '@/lib/market-data-refresh';
+import { liveQuoteRefreshOptions, QUOTE_AUTO_REFRESH_INTERVAL_MS } from '@/lib/market-data-refresh';
 import { describeMarketSession, getMarketSessionChipClass } from '@/lib/market-session';
 import { queryKeys } from '@/lib/query-keys';
+import { useLiveNow } from '@/lib/use-live-now';
 import { webApi } from '@/lib/api';
 import {
   formatCurrency,
@@ -30,6 +32,7 @@ const preferredRangeStorageKey = 'pv-stock-history-range';
 const validStockHistoryRanges = new Set<StockHistoryRange>(['1D', '1W', '1M', '3M', '1Y']);
 
 export default function StockDetailPage() {
+  const now = useLiveNow();
   const queryClient = useQueryClient();
   const params = useParams<{ symbol: string }>();
   const searchParams = useSearchParams();
@@ -198,6 +201,28 @@ export default function StockDetailPage() {
     ? null
     : `${marketSession.statusLabel} session. Paper trading is only available during regular market hours.`;
   const staleQuoteMessage = getStaleQuoteMessage(quote.stale);
+  const historyPoints = historyQuery.data?.points ?? [];
+  const oneYearHistoryPoints = oneYearHistory?.points ?? [];
+  const latestHistoryPoint =
+    historyPoints[historyPoints.length - 1] ??
+    oneYearHistoryPoints[oneYearHistoryPoints.length - 1] ??
+    null;
+  const stockLiveStatus = getLiveFeedbackStatus({
+    subject: `${quote.symbol} quote`,
+    timestamps: [quote.quoteTimestamp, holding?.quoteTimestamp, latestHistoryPoint?.timestamp],
+    now,
+    refreshIntervalMs: QUOTE_AUTO_REFRESH_INTERVAL_MS,
+    isRefreshing: detailQuery.isFetching || historyQuery.isFetching || portfolioQuery.isFetching,
+    stale: quote.stale || Boolean(holding?.staleQuote),
+  });
+  const tradeContextStatus = getLiveFeedbackStatus({
+    subject: `${quote.symbol} trade context`,
+    timestamps: [quote.quoteTimestamp, holding?.quoteTimestamp],
+    now,
+    refreshIntervalMs: QUOTE_AUTO_REFRESH_INTERVAL_MS,
+    isRefreshing: detailQuery.isFetching || portfolioQuery.isFetching,
+    stale: quote.stale || Boolean(holding?.staleQuote),
+  });
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -269,6 +294,15 @@ export default function StockDetailPage() {
               <span className="pv-kicker pv-kicker-inverse">
                 {formatMarketTimestamp(quote.quoteTimestamp, quote.marketTimezone)}
               </span>
+              <div className={`pv-live-readout ${stockLiveStatus.tone}`}>
+                <span
+                  aria-hidden="true"
+                  className={`pv-live-dot ${stockLiveStatus.pulse ? 'pulse' : ''}`}
+                />
+                <strong>{stockLiveStatus.chip}</strong>
+                <span>{stockLiveStatus.relativeLabel}</span>
+                <span className="pv-live-inline-copy">{stockLiveStatus.cadenceLabel}</span>
+              </div>
             </div>
 
             <div className="pv-stock-hero-metrics">
@@ -313,6 +347,20 @@ export default function StockDetailPage() {
               subtitle="Current session context and key quote marks."
             />
             <div className="pv-stock-terminal">
+              <div className={`pv-live-status-banner ${stockLiveStatus.tone}`}>
+                <div className="pv-live-status-meta">
+                  <span className="pv-live-status-chipline">
+                    <span
+                      aria-hidden="true"
+                      className={`pv-live-dot ${stockLiveStatus.pulse ? 'pulse' : ''}`}
+                    />
+                    <strong>{stockLiveStatus.chip}</strong>
+                    <span>{stockLiveStatus.relativeLabel}</span>
+                  </span>
+                  <span>{stockLiveStatus.detail}</span>
+                </div>
+                <span className="pv-live-status-cadence">{stockLiveStatus.cadenceLabel}</span>
+              </div>
               <div className="pv-stock-terminal-head">
                 <span className={`pv-chip ${getMarketSessionChipClass(quote.marketSession)}`}>
                   {marketSession.statusLabel}
@@ -415,6 +463,20 @@ export default function StockDetailPage() {
             subtitle="Live account state, sizing room, and session rules before you send an order."
           />
           <div className="pv-trade-context-panel">
+            <div className={`pv-live-status-banner ${tradeContextStatus.tone}`}>
+              <div className="pv-live-status-meta">
+                <span className="pv-live-status-chipline">
+                  <span
+                    aria-hidden="true"
+                    className={`pv-live-dot ${tradeContextStatus.pulse ? 'pulse' : ''}`}
+                  />
+                  <strong>{tradeContextStatus.chip}</strong>
+                  <span>{tradeContextStatus.relativeLabel}</span>
+                </span>
+                <span>{tradeContextStatus.detail}</span>
+              </div>
+              <span className="pv-live-status-cadence">{tradeContextStatus.cadenceLabel}</span>
+            </div>
             <div className="pv-trade-context-strip">
               <div className="pv-trade-context-chip">
                 <span className="pv-kicker">Session</span>

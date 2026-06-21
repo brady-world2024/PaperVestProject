@@ -442,7 +442,7 @@ input {
 
 .pv-command-status-strip {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px;
 }
 
@@ -479,6 +479,12 @@ input {
   font-size: 1.02rem;
   line-height: 1.15;
   overflow-wrap: anywhere;
+}
+
+.pv-live-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
 }
 
 .pv-command-status-copy {
@@ -673,6 +679,108 @@ input {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.pv-live-readout,
+.pv-live-inline,
+.pv-live-status-chipline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pv-live-readout,
+.pv-live-inline {
+  color: rgba(255, 253, 248, 0.84);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.pv-live-inline {
+  color: var(--pv-color-text-secondary);
+}
+
+.pv-live-readout.positive strong,
+.pv-live-inline.positive strong,
+.pv-live-status-banner.positive strong {
+  color: var(--pv-color-positive);
+}
+
+.pv-live-readout.caution strong,
+.pv-live-inline.caution strong,
+.pv-live-status-banner.caution strong {
+  color: var(--pv-color-negative);
+}
+
+.pv-live-inline-copy {
+  color: rgba(255, 253, 248, 0.62);
+}
+
+.pv-live-inline .pv-live-inline-copy {
+  color: var(--pv-color-text-secondary);
+}
+
+.pv-live-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+  background: rgba(213, 241, 236, 0.78);
+  box-shadow: 0 0 0 0 rgba(126, 232, 181, 0.42);
+}
+
+.pv-live-readout.caution .pv-live-dot,
+.pv-live-inline.caution .pv-live-dot,
+.pv-live-status-banner.caution .pv-live-dot {
+  background: rgba(233, 153, 135, 0.88);
+  box-shadow: 0 0 0 0 rgba(233, 153, 135, 0.32);
+}
+
+.pv-live-dot.pulse {
+  animation: pv-live-pulse 1.8s ease-out infinite;
+}
+
+.pv-live-status-banner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(227, 220, 202, 0.88);
+  background: rgba(255, 255, 255, 0.76);
+  color: var(--pv-color-text-secondary);
+}
+
+.pv-live-status-banner.positive {
+  background: rgba(30, 158, 98, 0.08);
+  border-color: rgba(126, 232, 181, 0.24);
+}
+
+.pv-live-status-banner.caution {
+  background: rgba(194, 90, 68, 0.08);
+  border-color: rgba(233, 153, 135, 0.22);
+}
+
+.pv-live-status-meta {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.pv-live-status-meta strong {
+  color: var(--pv-color-text-primary);
+}
+
+.pv-live-status-cadence {
+  color: var(--pv-color-text-secondary);
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: right;
 }
 
 .pv-stock-price {
@@ -1228,6 +1336,23 @@ input {
   gap: 4px;
   min-width: fit-content;
   text-align: right;
+}
+
+@keyframes pv-live-pulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(126, 232, 181, 0.42);
+  }
+
+  70% {
+    transform: scale(1.06);
+    box-shadow: 0 0 0 8px rgba(126, 232, 181, 0);
+  }
+
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(126, 232, 181, 0);
+  }
 }
 
 .pv-workspace-toolbar {
