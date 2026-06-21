@@ -651,6 +651,20 @@ input {
   min-width: 0;
 }
 
+.pv-chart-toolbar-copy {
+  margin: 6px 0 0;
+  color: var(--pv-color-text-secondary);
+  font-size: 0.84rem;
+  line-height: 1.5;
+  max-width: 56ch;
+}
+
+.pv-chart-toolbar-stack {
+  display: grid;
+  gap: 10px;
+  justify-items: end;
+}
+
 .pv-range-group {
   display: flex;
   flex-wrap: nowrap;
@@ -687,10 +701,46 @@ input {
   border-radius: 999px;
 }
 
+.pv-indicator-group {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.pv-indicator-button,
+.pv-indicator-pill {
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 780;
+  letter-spacing: 0.01em;
+}
+
+.pv-indicator-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(15, 139, 141, 0.18);
+  background: rgba(15, 139, 141, 0.08);
+  color: var(--pv-color-accent);
+}
+
+.pv-chart-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .pv-chart-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
+}
+
+.pv-chart-summary-auto {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 
 .pv-chart-summary-card {
@@ -729,6 +779,40 @@ input {
   display: block;
   width: 100%;
   height: auto;
+}
+
+.pv-chart-tooltip {
+  position: absolute;
+  z-index: 2;
+  width: 208px;
+  display: grid;
+  gap: 10px;
+  padding: 12px 13px;
+  border-radius: 16px;
+  border: 1px solid rgba(17, 34, 53, 0.12);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 20px 30px rgba(17, 34, 53, 0.1);
+}
+
+.pv-chart-tooltip strong {
+  overflow-wrap: anywhere;
+}
+
+.pv-chart-tooltip-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, auto);
+  gap: 6px 10px;
+  align-items: baseline;
+}
+
+.pv-chart-tooltip-grid span {
+  color: var(--pv-color-text-secondary);
+  font-size: 0.74rem;
+}
+
+.pv-chart-tooltip-grid strong {
+  font-size: 0.78rem;
+  text-align: right;
 }
 
 .pv-chart-axis-label {
@@ -1454,6 +1538,12 @@ input {
     justify-content: flex-start;
   }
 
+  .pv-chart-toolbar-stack,
+  .pv-indicator-group {
+    justify-items: start;
+    justify-content: flex-start;
+  }
+
   .pv-list-row,
   .pv-list-row-head,
   .pv-order-row-head {
@@ -1492,6 +1582,10 @@ input {
 
   .pv-range-group {
     flex-wrap: wrap;
+  }
+
+  .pv-chart-action-row {
+    width: 100%;
   }
 
   .pv-shell-topbar-actions,

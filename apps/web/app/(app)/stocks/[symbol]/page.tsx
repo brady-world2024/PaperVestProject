@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams, useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getMarketSessionPresentation, type StockHistoryRange } from '@papervest/shared-types';
 
@@ -26,6 +26,9 @@ import {
   formatSignedCurrency,
 } from '@/lib/formatters';
 
+const preferredRangeStorageKey = 'pv-stock-history-range';
+const validStockHistoryRanges = new Set<StockHistoryRange>(['1D', '1W', '1M', '3M', '1Y']);
+
 export default function StockDetailPage() {
   const queryClient = useQueryClient();
   const params = useParams<{ symbol: string }>();
@@ -33,6 +36,7 @@ export default function StockDetailPage() {
   const symbol = params.symbol;
   const companyName = searchParams.get('companyName') ?? undefined;
   const [historyRange, setHistoryRange] = useState<StockHistoryRange>('1M');
+  const [historyRangeReady, setHistoryRangeReady] = useState(false);
 
   const detailQuery = useQuery({
     queryKey: queryKeys.stockDetail(symbol),
@@ -44,6 +48,12 @@ export default function StockDetailPage() {
     queryKey: queryKeys.stockHistory(symbol, historyRange),
     queryFn: () => webApi.getStockHistory(symbol, historyRange),
     placeholderData: (previousData) => previousData,
+  });
+
+  const oneYearHistoryQuery = useQuery({
+    queryKey: queryKeys.stockHistory(symbol, '1Y'),
+    queryFn: () => webApi.getStockHistory(symbol, '1Y'),
+    enabled: historyRange !== '1Y',
   });
 
   const watchlistQuery = useQuery({
@@ -110,6 +120,7 @@ export default function StockDetailPage() {
   });
 
   const quote = detailQuery.data;
+  const oneYearHistory = historyRange === '1Y' ? historyQuery.data : oneYearHistoryQuery.data;
   const watchlistItem = watchlistQuery.data?.items.find((item) => item.symbol === symbol);
   const holding = portfolioQuery.data?.holdings.find((item) => item.symbol === symbol);
   const isWatchlisted = Boolean(watchlistItem);
@@ -181,6 +192,26 @@ export default function StockDetailPage() {
     : `${marketSession.statusLabel} session. Paper trading is only available during regular market hours.`;
   const staleQuoteMessage = getStaleQuoteMessage(quote.stale);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const savedRange = window.localStorage.getItem(preferredRangeStorageKey);
+    if (isStockHistoryRange(savedRange) && savedRange !== historyRange) {
+      setHistoryRange(savedRange);
+    }
+    setHistoryRangeReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !historyRangeReady) {
+      return;
+    }
+
+    window.localStorage.setItem(preferredRangeStorageKey, historyRange);
+  }, [historyRange, historyRangeReady]);
+
   return (
     <main className="pv-page pv-stock-layout">
       <section className="pv-stack">
@@ -249,10 +280,22 @@ export default function StockDetailPage() {
           <StockHistoryChart
             range={historyRange}
             history={historyQuery.data}
+            contextHistory={oneYearHistory}
+            symbol={quote.symbol}
             loading={historyQuery.isLoading}
             refreshing={historyQuery.isFetching && Boolean(historyQuery.data)}
             errorMessage={chartErrorMessage}
             onSelectRange={setHistoryRange}
+            researchActions={[
+              {
+                href: `/orders?symbol=${encodeURIComponent(symbol)}&side=${holding ? 'SELL' : 'BUY'}`,
+                label: holding ? 'Protect with target-price sell' : 'Queue target-price buy',
+              },
+              {
+                href: '/watchlist',
+                label: watchlistItem ? 'Review watchlist context' : 'Open watchlist workspace',
+              },
+            ]}
           />
         </AppCard>
 
@@ -451,4 +494,8 @@ export default function StockDetailPage() {
       </section>
     </main>
   );
+}
+
+function isStockHistoryRange(value: string | null): value is StockHistoryRange {
+  return value != null && validStockHistoryRanges.has(value as StockHistoryRange);
 }
