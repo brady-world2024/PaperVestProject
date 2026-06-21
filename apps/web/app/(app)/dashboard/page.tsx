@@ -8,8 +8,9 @@ import {
   type PortfolioHistoryRange,
 } from '@papervest/shared-types';
 
-import { AppButtonLink } from '@/components/app-button';
+import { AppButton, AppButtonLink } from '@/components/app-button';
 import { AppCard } from '@/components/app-card';
+import { DashboardModuleCard } from '@/components/dashboard-module-card';
 import { AppField } from '@/components/app-field';
 import { EmptyState } from '@/components/empty-state';
 import { InlineNotice } from '@/components/inline-notice';
@@ -17,6 +18,14 @@ import { MetricCard } from '@/components/metric-card';
 import { PortfolioHistoryChart } from '@/components/portfolio-history-chart';
 import { QuoteRow } from '@/components/quote-row';
 import { SectionHeader } from '@/components/section-header';
+import {
+  getDashboardModuleMeta,
+  getDashboardModulesForColumn,
+  getHiddenDashboardModules,
+  type DashboardModuleColumn,
+  type DashboardModuleId,
+  type DashboardModulePreference,
+} from '@/lib/dashboard-workspace';
 import {
   getActiveCommandCenterOrders,
   getCommandCenterExposureSummary,
@@ -36,12 +45,14 @@ import { getDegradedHomeMarketMessage, getStaleQuoteBadge, getStaleQuoteMessage 
 import { liveQuoteRefreshOptions } from '@/lib/market-data-refresh';
 import { getMarketSessionChipClass } from '@/lib/market-session';
 import { queryKeys } from '@/lib/query-keys';
+import { useDashboardWorkspace } from '@/lib/use-dashboard-workspace';
 
 export default function DashboardPage() {
   const [searchText, setSearchText] = useState('');
   const [historyRange, setHistoryRange] = useState<PortfolioHistoryRange>('1M');
   const deferredSearch = useDeferredValue(searchText.trim());
   const lastTrackedSearchRef = useRef<string | null>(null);
+  const dashboardWorkspace = useDashboardWorkspace();
 
   const homeQuery = useQuery({
     queryKey: queryKeys.home,
@@ -100,6 +111,15 @@ export default function DashboardPage() {
     activeConditionalOrders,
     marketSummary,
   });
+  const primaryModules = getDashboardModulesForColumn(
+    dashboardWorkspace.preferences,
+    'primary'
+  );
+  const secondaryModules = getDashboardModulesForColumn(
+    dashboardWorkspace.preferences,
+    'secondary'
+  );
+  const hiddenModules = getHiddenDashboardModules(dashboardWorkspace.preferences);
   const topExposureHoldings = [...holdings]
     .sort((left, right) => right.marketValue - left.marketValue)
     .slice(0, 3);
@@ -125,6 +145,512 @@ export default function DashboardPage() {
       },
     });
   }, [deferredSearch, searchQuery.data, searchQuery.isSuccess]);
+
+  const renderCollapsedPreview = (moduleId: DashboardModuleId) => {
+    const meta = getDashboardModuleMeta(moduleId);
+
+    return (
+      <div className="pv-module-collapsed-preview">
+        <span className="pv-kicker">Collapsed module</span>
+        <strong>{meta.shortLabel}</strong>
+        <span>{meta.description}</span>
+      </div>
+    );
+  };
+
+  const renderWorkspaceEmptyState = (column: DashboardModuleColumn) => (
+    <AppCard className="pv-dashboard-empty-column">
+      <EmptyState
+        title={column === 'primary' ? 'Primary lane is empty' : 'Secondary lane is empty'}
+        description="Restore a hidden module or move one across from the other lane to rebuild this side of the workspace."
+      />
+    </AppCard>
+  );
+
+  const renderModule = (preference: DashboardModulePreference) => {
+    const columnModules = preference.column === 'primary' ? primaryModules : secondaryModules;
+    const moduleIndex = columnModules.findIndex((module) => module.id === preference.id);
+    const meta = getDashboardModuleMeta(preference.id);
+    const commonProps = {
+      title: meta.label,
+      subtitle: meta.description,
+      collapsed: preference.collapsed,
+      className: preference.id === 'nextActions' ? 'strong pv-command-next-card' : undefined,
+      canMoveUp: moduleIndex > 0,
+      canMoveDown: moduleIndex >= 0 && moduleIndex < columnModules.length - 1,
+      canMoveAcross: true,
+      moveAcrossLabel:
+        preference.column === 'primary' ? 'Send right' : 'Send left',
+      onToggleCollapse: () => dashboardWorkspace.toggleCollapsed(preference.id),
+      onMoveUp: () => dashboardWorkspace.moveWithinColumn(preference.id, 'up'),
+      onMoveDown: () => dashboardWorkspace.moveWithinColumn(preference.id, 'down'),
+      onMoveAcross: () =>
+        dashboardWorkspace.moveToColumn(
+          preference.id,
+          preference.column === 'primary' ? 'secondary' : 'primary'
+        ),
+      onHide: () => dashboardWorkspace.toggleVisibility(preference.id, false),
+      collapsedPreview: renderCollapsedPreview(preference.id),
+    };
+
+    switch (preference.id) {
+      case 'history':
+        return (
+          <DashboardModuleCard
+            key={preference.id}
+            {...commonProps}
+          >
+            <PortfolioHistoryChart
+              range={historyRange}
+              history={portfolioHistoryQuery.data}
+              loading={portfolioHistoryQuery.isLoading}
+              refreshing={portfolioHistoryQuery.isFetching}
+              errorMessage={
+                portfolioHistoryQuery.isError
+                  ? webApi.getApiErrorMessage(
+                      portfolioHistoryQuery.error,
+                      'Unable to load portfolio history'
+                    )
+                  : null
+              }
+              onSelectRange={setHistoryRange}
+            />
+          </DashboardModuleCard>
+        );
+      case 'watchlist':
+        return (
+          <DashboardModuleCard
+            key={preference.id}
+            {...commonProps}
+            action={
+              <AppButtonLink href="/watchlist" variant="ghost">
+                Open watchlist
+              </AppButtonLink>
+            }
+          >
+            {watchlistQuery.isLoading ? (
+              <div className="pv-subgrid">
+                <div className="pv-skeleton" />
+                <div className="pv-skeleton" />
+              </div>
+            ) : watchlistQuery.isError ? (
+              <InlineNotice
+                tone="error"
+                message={webApi.getApiErrorMessage(
+                  watchlistQuery.error,
+                  'Unable to load the watchlist'
+                )}
+              />
+            ) : watchlistItems.length ? (
+              <div className="pv-list">
+                {watchlistItems.slice(0, 4).map((item) => {
+                  const marketSession = getMarketSessionPresentation(
+                    item.marketSession ?? 'CLOSED'
+                  );
+
+                  return (
+                    <Link
+                      key={item.symbol}
+                      className="pv-list-row"
+                      href={`/stocks/${item.symbol}?companyName=${encodeURIComponent(item.companyName)}`}
+                    >
+                      <div className="pv-list-primary">
+                        <span className="pv-list-symbol-line">
+                          <span className="pv-list-symbol">{item.symbol}</span>
+                          <span className={`pv-chip ${getMarketSessionChipClass(item.marketSession ?? 'CLOSED')}`}>
+                            {marketSession.statusLabel}
+                          </span>
+                          {getStaleQuoteBadge(item.staleQuote) ? (
+                            <span className="pv-chip neutral">{getStaleQuoteBadge(item.staleQuote)}</span>
+                          ) : null}
+                        </span>
+                        <span className="pv-list-company">{item.companyName}</span>
+                        {item.quoteTimestamp ? (
+                          <span className="pv-list-meta-line">
+                            <span>{marketSession.priceLabel}</span>
+                            <span>
+                              {formatMarketTimestamp(
+                                item.quoteTimestamp,
+                                item.marketTimezone ?? undefined
+                              )}
+                            </span>
+                          </span>
+                        ) : null}
+                        {getStaleQuoteMessage(item.staleQuote) ? (
+                          <span className="pv-kicker">{getStaleQuoteMessage(item.staleQuote)}</span>
+                        ) : null}
+                      </div>
+                      <div className="pv-list-secondary">
+                        <strong>{item.currentPrice == null ? '...' : formatCurrency(item.currentPrice)}</strong>
+                        {item.dailyChange != null && item.dailyChangePercent != null ? (
+                          <span className={item.dailyChange >= 0 ? 'pv-positive' : 'pv-negative'}>
+                            {formatSignedCurrency(item.dailyChange)} · {formatPercent(item.dailyChangePercent)}
+                          </span>
+                        ) : (
+                          <span className="pv-kicker">Quote unavailable</span>
+                        )}
+                        <span className="pv-kicker">{marketSession.changeLabel}</span>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            ) : (
+              <EmptyState
+                title="No saved names yet"
+                description="Use search or stock detail to pin a symbol to your watchlist."
+              />
+            )}
+          </DashboardModuleCard>
+        );
+      case 'activity':
+        return (
+          <DashboardModuleCard
+            key={preference.id}
+            {...commonProps}
+            action={
+              <AppButtonLink href="/activity" variant="ghost">
+                Full history
+              </AppButtonLink>
+            }
+          >
+            {historyQuery.isLoading ? (
+              <div className="pv-subgrid">
+                <div className="pv-skeleton" />
+                <div className="pv-skeleton" />
+              </div>
+            ) : historyQuery.isError ? (
+              <InlineNotice
+                tone="error"
+                message={webApi.getApiErrorMessage(
+                  historyQuery.error,
+                  'Unable to load recent trades'
+                )}
+              />
+            ) : recentTrades.length ? (
+              <div className="pv-list">
+                {recentTrades.map((trade) => (
+                  <Link
+                    key={trade.tradeId}
+                    className="pv-list-row"
+                    href={`/stocks/${trade.symbol}?companyName=${encodeURIComponent(
+                      trade.companyName
+                    )}`}
+                  >
+                    <div className="pv-list-primary">
+                      <span className="pv-list-symbol-line">
+                        <span className="pv-list-symbol">{trade.symbol}</span>
+                        <span className={`pv-chip ${trade.side === 'BUY' ? 'buy' : 'sell'}`}>
+                          {trade.side}
+                        </span>
+                      </span>
+                      <span className="pv-list-company">{trade.companyName}</span>
+                      <span className="pv-list-meta-line">
+                        <span>{formatShares(trade.quantity)}</span>
+                        <span>{formatDateTime(trade.executedAt)}</span>
+                      </span>
+                    </div>
+                    <div className="pv-list-secondary">
+                      <strong>{formatCurrency(trade.executedPrice)}</strong>
+                      <span className={trade.realizedPnl >= 0 ? 'pv-positive' : 'pv-negative'}>
+                        {formatSignedCurrency(trade.realizedPnl)}
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                title="No trades yet"
+                description="Your last few buys and sells will appear here after the first executed order."
+              />
+            )}
+          </DashboardModuleCard>
+        );
+      case 'marketBoard':
+        return (
+          <DashboardModuleCard
+            key={preference.id}
+            {...commonProps}
+            action={
+              <AppButtonLink href="/watchlist" variant="ghost">
+                Watchlist
+              </AppButtonLink>
+            }
+          >
+            {homeQuery.isLoading ? (
+              <div className="pv-subgrid">
+                <div className="pv-skeleton" />
+                <div className="pv-skeleton" />
+                <div className="pv-skeleton" />
+              </div>
+            ) : homeQuery.isError ? (
+              <InlineNotice
+                tone="error"
+                message={webApi.getApiErrorMessage(
+                  homeQuery.error,
+                  'Unable to load the home market board'
+                )}
+              />
+            ) : (
+              <>
+                {degradedHomeMarketMessage ? (
+                  <div style={{ marginBottom: '12px' }}>
+                    <InlineNotice tone="info" message={degradedHomeMarketMessage} />
+                  </div>
+                ) : null}
+                <div className="pv-list">
+                  {homeQuery.data?.quotes.map((quote) => (
+                    <QuoteRow key={quote.symbol} quote={quote} />
+                  ))}
+                </div>
+              </>
+            )}
+          </DashboardModuleCard>
+        );
+      case 'nextActions':
+        return (
+          <DashboardModuleCard key={preference.id} {...commonProps}>
+            <div className="pv-next-actions">
+              {nextActions.map((action) => (
+                <Link
+                  key={action.id}
+                  className={`pv-next-action-card ${action.tone}`}
+                  href={action.href}
+                >
+                  <span className="pv-next-action-title">{action.title}</span>
+                  <span className="pv-next-action-copy">{action.description}</span>
+                  <span className="pv-next-action-link">{action.label}</span>
+                </Link>
+              ))}
+            </div>
+          </DashboardModuleCard>
+        );
+      case 'exposure':
+        return (
+          <DashboardModuleCard
+            key={preference.id}
+            {...commonProps}
+            action={
+              <AppButtonLink href="/portfolio" variant="ghost">
+                Portfolio detail
+              </AppButtonLink>
+            }
+          >
+            <div className="pv-exposure-bar" aria-hidden="true">
+              <span
+                className="pv-exposure-segment cash"
+                style={{ width: `${exposureSummary.cashWeight}%` }}
+              />
+              <span
+                className="pv-exposure-segment invested"
+                style={{ width: `${exposureSummary.investedWeight}%` }}
+              />
+            </div>
+
+            <div className="pv-grid two">
+              <div className="pv-chart-summary-card">
+                <span className="pv-kicker">Cash allocation</span>
+                <strong>{formatPercent(exposureSummary.cashWeight)}</strong>
+              </div>
+              <div className="pv-chart-summary-card">
+                <span className="pv-kicker">Invested allocation</span>
+                <strong>{formatPercent(exposureSummary.investedWeight)}</strong>
+              </div>
+              <div className="pv-chart-summary-card">
+                <span className="pv-kicker">Largest position</span>
+                <strong>
+                  {exposureSummary.topHolding
+                    ? `${exposureSummary.topHolding.symbol} · ${formatPercent(
+                        exposureSummary.topHoldingWeight
+                      )}`
+                    : 'No position yet'}
+                </strong>
+              </div>
+              <div className="pv-chart-summary-card">
+                <span className="pv-kicker">Top 3 concentration</span>
+                <strong>{formatPercent(exposureSummary.topThreeWeight)}</strong>
+              </div>
+            </div>
+
+            {topExposureHoldings.length ? (
+              <div className="pv-list">
+                {topExposureHoldings.map((holding) => (
+                  <Link
+                    key={holding.symbol}
+                    className="pv-list-row"
+                    href={`/stocks/${holding.symbol}?companyName=${encodeURIComponent(
+                      holding.companyName
+                    )}`}
+                  >
+                    <div className="pv-list-primary">
+                      <span className="pv-list-symbol">{holding.symbol}</span>
+                      <span className="pv-list-company">{holding.companyName}</span>
+                    </div>
+                    <div className="pv-list-secondary">
+                      <strong>{formatCurrency(holding.marketValue)}</strong>
+                      <span className="pv-kicker">
+                        {formatPercent(
+                          summary?.totalPortfolioValue
+                            ? (holding.marketValue / summary.totalPortfolioValue) * 100
+                            : 0
+                        )}{' '}
+                        of book
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                title="Exposure will appear after the first buy"
+                description="Once holdings exist, this panel will highlight concentration and capital balance."
+              />
+            )}
+          </DashboardModuleCard>
+        );
+      case 'activeOrders':
+        return (
+          <DashboardModuleCard
+            key={preference.id}
+            {...commonProps}
+            action={
+              <AppButtonLink href="/orders" variant="ghost">
+                Open orders
+              </AppButtonLink>
+            }
+          >
+            {conditionalOrdersQuery.isLoading ? (
+              <div className="pv-subgrid">
+                <div className="pv-skeleton" />
+                <div className="pv-skeleton" />
+              </div>
+            ) : conditionalOrdersQuery.isError ? (
+              <InlineNotice
+                tone="error"
+                message={webApi.getApiErrorMessage(
+                  conditionalOrdersQuery.error,
+                  'Unable to load conditional orders'
+                )}
+              />
+            ) : activeConditionalOrders.length ? (
+              <div className="pv-list">
+                {activeConditionalOrders.slice(0, 3).map((order) => (
+                  <Link key={order.id} className="pv-list-row" href="/orders">
+                    <div className="pv-list-primary">
+                      <span className="pv-list-symbol-line">
+                        <span className="pv-list-symbol">{order.symbol}</span>
+                        <span className={`pv-chip ${order.side === 'BUY' ? 'buy' : 'sell'}`}>
+                          {order.side}
+                        </span>
+                        <span className="pv-chip neutral">{order.status}</span>
+                      </span>
+                      <span className="pv-list-company">
+                        Target {formatCurrency(order.targetPrice)} · {formatShares(order.quantity)} shares
+                      </span>
+                      <span className="pv-list-meta-line">
+                        <span>Created {formatDateTime(order.createdAt)}</span>
+                        <span>
+                          {order.lastCheckedPrice == null
+                            ? 'Waiting for first price check'
+                            : `Last check ${formatCurrency(order.lastCheckedPrice)}`}
+                        </span>
+                      </span>
+                    </div>
+                    <div className="pv-list-secondary">
+                      <strong>{order.executionKey}</strong>
+                      <span className="pv-kicker">
+                        {order.triggeredAt
+                          ? `Triggered ${formatDateTime(order.triggeredAt)}`
+                          : 'Still armed'}
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                title="No active conditional orders"
+                description="Create a target-price buy or sell order to turn the dashboard into a more automated command center."
+              />
+            )}
+          </DashboardModuleCard>
+        );
+      case 'holdingsPulse':
+        return (
+          <DashboardModuleCard key={preference.id} {...commonProps}>
+            {portfolioQuery.isLoading ? (
+              <div className="pv-subgrid">
+                <div className="pv-skeleton" />
+                <div className="pv-skeleton" />
+              </div>
+            ) : holdings.length ? (
+              <div className="pv-list">
+                {holdings.slice(0, 4).map((holding) => {
+                  const marketSession = getMarketSessionPresentation(
+                    holding.marketSession ?? 'CLOSED'
+                  );
+
+                  return (
+                    <Link
+                      key={holding.symbol}
+                      className="pv-list-row"
+                      href={`/stocks/${holding.symbol}?companyName=${encodeURIComponent(
+                        holding.companyName
+                      )}`}
+                    >
+                      <div className="pv-list-primary">
+                        <span className="pv-list-symbol-line">
+                          <span className="pv-list-symbol">{holding.symbol}</span>
+                          <span className={`pv-chip ${getMarketSessionChipClass(holding.marketSession ?? 'CLOSED')}`}>
+                            {marketSession.statusLabel}
+                          </span>
+                          {getStaleQuoteBadge(holding.staleQuote) ? (
+                            <span className="pv-chip neutral">{getStaleQuoteBadge(holding.staleQuote)}</span>
+                          ) : null}
+                        </span>
+                        <span className="pv-list-company">{holding.companyName}</span>
+                        <span className="pv-list-meta-line">
+                          <span>{formatShares(holding.quantity)} shares</span>
+                          <span>Avg {formatCurrency(holding.averageCost)}</span>
+                        </span>
+                        {holding.quoteTimestamp ? (
+                          <span className="pv-list-meta-line">
+                            <span>{marketSession.priceLabel}</span>
+                            <span>
+                              {formatMarketTimestamp(
+                                holding.quoteTimestamp,
+                                holding.marketTimezone ?? undefined
+                              )}
+                            </span>
+                          </span>
+                        ) : null}
+                        {getStaleQuoteMessage(holding.staleQuote) ? (
+                          <span className="pv-kicker">{getStaleQuoteMessage(holding.staleQuote)}</span>
+                        ) : null}
+                      </div>
+                      <div className="pv-list-secondary">
+                        <strong>{formatCurrency(holding.marketValue)}</strong>
+                        <span className={holding.unrealizedPnl >= 0 ? 'pv-positive' : 'pv-negative'}>
+                          {formatSignedCurrency(holding.unrealizedPnl)} · {formatPercent(holding.unrealizedPnlPercent)}
+                        </span>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            ) : (
+              <EmptyState
+                title="No holdings yet"
+                description="Place a simulated buy order from any stock detail page and positions will show up here."
+              />
+            )}
+          </DashboardModuleCard>
+        );
+      default:
+        return null;
+    }
+  };
 
   return (
     <main className="pv-page pv-stack">
@@ -276,410 +802,90 @@ export default function DashboardPage() {
         </AppCard>
       </section>
 
-      <section className="pv-command-center-grid">
-        <div className="pv-stack">
-          <AppCard className="pv-chart-card">
-            <PortfolioHistoryChart
-              range={historyRange}
-              history={portfolioHistoryQuery.data}
-              loading={portfolioHistoryQuery.isLoading}
-              refreshing={portfolioHistoryQuery.isFetching}
-              errorMessage={
-                portfolioHistoryQuery.isError
-                  ? webApi.getApiErrorMessage(portfolioHistoryQuery.error, 'Unable to load portfolio history')
-                  : null
-              }
-              onSelectRange={setHistoryRange}
-            />
-          </AppCard>
-
-          <section className="pv-dashboard-subgrid">
-            <AppCard>
-              <SectionHeader
-                title="Watchlist preview"
-                subtitle="Saved symbols with live quote context."
-                action={
-                  <AppButtonLink href="/watchlist" variant="ghost">
-                    Open watchlist
-                  </AppButtonLink>
-                }
-              />
-              {watchlistQuery.isLoading ? (
-                <div className="pv-subgrid">
-                  <div className="pv-skeleton" />
-                  <div className="pv-skeleton" />
-                </div>
-              ) : watchlistQuery.isError ? (
-                <InlineNotice
-                  tone="error"
-                  message={webApi.getApiErrorMessage(watchlistQuery.error, 'Unable to load the watchlist')}
-                />
-              ) : watchlistItems.length ? (
-                <div className="pv-list">
-                  {watchlistItems.slice(0, 4).map((item) => {
-                    const marketSession = getMarketSessionPresentation(item.marketSession ?? 'CLOSED');
-
-                    return (
-                      <Link
-                        key={item.symbol}
-                        className="pv-list-row"
-                        href={`/stocks/${item.symbol}?companyName=${encodeURIComponent(item.companyName)}`}
-                      >
-                        <div className="pv-list-primary">
-                          <span className="pv-list-symbol-line">
-                            <span className="pv-list-symbol">{item.symbol}</span>
-                            <span className={`pv-chip ${getMarketSessionChipClass(item.marketSession ?? 'CLOSED')}`}>
-                              {marketSession.statusLabel}
-                            </span>
-                            {getStaleQuoteBadge(item.staleQuote) ? (
-                              <span className="pv-chip neutral">{getStaleQuoteBadge(item.staleQuote)}</span>
-                            ) : null}
-                          </span>
-                          <span className="pv-list-company">{item.companyName}</span>
-                          {item.quoteTimestamp ? (
-                            <span className="pv-list-meta-line">
-                              <span>{marketSession.priceLabel}</span>
-                              <span>{formatMarketTimestamp(item.quoteTimestamp, item.marketTimezone ?? undefined)}</span>
-                            </span>
-                          ) : null}
-                          {getStaleQuoteMessage(item.staleQuote) ? (
-                            <span className="pv-kicker">{getStaleQuoteMessage(item.staleQuote)}</span>
-                          ) : null}
-                        </div>
-                        <div className="pv-list-secondary">
-                          <strong>{item.currentPrice == null ? '...' : formatCurrency(item.currentPrice)}</strong>
-                          {item.dailyChange != null && item.dailyChangePercent != null ? (
-                            <span className={item.dailyChange >= 0 ? 'pv-positive' : 'pv-negative'}>
-                              {formatSignedCurrency(item.dailyChange)} · {formatPercent(item.dailyChangePercent)}
-                            </span>
-                          ) : (
-                            <span className="pv-kicker">Quote unavailable</span>
-                          )}
-                          <span className="pv-kicker">{marketSession.changeLabel}</span>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-              ) : (
-                <EmptyState
-                  title="No saved names yet"
-                  description="Use search or stock detail to pin a symbol to your watchlist."
-                />
-              )}
-            </AppCard>
-
-            <AppCard>
-              <SectionHeader
-                title="Recent activity"
-                subtitle="Latest simulated executions."
-                action={
-                  <AppButtonLink href="/activity" variant="ghost">
-                    Full history
-                  </AppButtonLink>
-                }
-              />
-              {historyQuery.isLoading ? (
-                <div className="pv-subgrid">
-                  <div className="pv-skeleton" />
-                  <div className="pv-skeleton" />
-                </div>
-              ) : historyQuery.isError ? (
-                <InlineNotice
-                  tone="error"
-                  message={webApi.getApiErrorMessage(historyQuery.error, 'Unable to load recent trades')}
-                />
-              ) : recentTrades.length ? (
-                <div className="pv-list">
-                  {recentTrades.map((trade) => (
-                    <Link
-                      key={trade.tradeId}
-                      className="pv-list-row"
-                      href={`/stocks/${trade.symbol}?companyName=${encodeURIComponent(trade.companyName)}`}
-                    >
-                      <div className="pv-list-primary">
-                        <span className="pv-list-symbol-line">
-                          <span className="pv-list-symbol">{trade.symbol}</span>
-                          <span className={`pv-chip ${trade.side === 'BUY' ? 'buy' : 'sell'}`}>{trade.side}</span>
-                        </span>
-                        <span className="pv-list-company">{trade.companyName}</span>
-                        <span className="pv-list-meta-line">
-                          <span>{formatShares(trade.quantity)}</span>
-                          <span>{formatDateTime(trade.executedAt)}</span>
-                        </span>
-                      </div>
-                      <div className="pv-list-secondary">
-                        <strong>{formatCurrency(trade.executedPrice)}</strong>
-                        <span className={trade.realizedPnl >= 0 ? 'pv-positive' : 'pv-negative'}>
-                          {formatSignedCurrency(trade.realizedPnl)}
-                        </span>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState
-                  title="No trades yet"
-                  description="Your last few buys and sells will appear here after the first executed order."
-                />
-              )}
-            </AppCard>
-          </section>
-
-          <AppCard className="pv-market-board-card">
-            <SectionHeader
-              title="Market board"
-              subtitle="Major US names with backend-managed quote context."
-              action={
-                <AppButtonLink href="/watchlist" variant="ghost">
-                  Watchlist
-                </AppButtonLink>
-              }
-            />
-            {homeQuery.isLoading ? (
-              <div className="pv-subgrid">
-                <div className="pv-skeleton" />
-                <div className="pv-skeleton" />
-                <div className="pv-skeleton" />
-              </div>
-            ) : homeQuery.isError ? (
-              <InlineNotice
-                tone="error"
-                message={webApi.getApiErrorMessage(homeQuery.error, 'Unable to load the home market board')}
-              />
-            ) : (
-              <>
-                {degradedHomeMarketMessage ? (
-                  <div style={{ marginBottom: '12px' }}>
-                    <InlineNotice tone="info" message={degradedHomeMarketMessage} />
-                  </div>
-                ) : null}
-                <div className="pv-list">
-                  {homeQuery.data?.quotes.map((quote) => (
-                    <QuoteRow key={quote.symbol} quote={quote} />
-                  ))}
-                </div>
-              </>
-            )}
-          </AppCard>
-        </div>
-
-        <div className="pv-stack">
-          <AppCard className="strong pv-command-next-card">
-            <SectionHeader
-              title="Next actions"
-              subtitle="The fastest moves to keep the account progressing."
-            />
-            <div className="pv-next-actions">
-              {nextActions.map((action) => (
-                <Link
-                  key={action.id}
-                  className={`pv-next-action-card ${action.tone}`}
-                  href={action.href}
-                >
-                  <span className="pv-next-action-title">{action.title}</span>
-                  <span className="pv-next-action-copy">{action.description}</span>
-                  <span className="pv-next-action-link">{action.label}</span>
-                </Link>
-              ))}
+      <AppCard className="pv-dashboard-settings-card">
+        <SectionHeader
+          title="Workspace settings"
+          subtitle="Save a layout that matches how you use the command center. Presets rebalance order and collapse state, while hidden modules stay under your control."
+        />
+        <div className="pv-dashboard-settings-grid">
+          <div className="pv-dashboard-settings-block">
+            <span className="pv-kicker">Workspace presets</span>
+            <div className="pv-dashboard-preset-row">
+              <AppButton
+                className="pv-module-button"
+                variant="ghost"
+                onClick={() => dashboardWorkspace.applyPreset('balanced')}
+              >
+                Balanced
+              </AppButton>
+              <AppButton
+                className="pv-module-button"
+                variant="ghost"
+                onClick={() => dashboardWorkspace.applyPreset('research')}
+              >
+                Research
+              </AppButton>
+              <AppButton
+                className="pv-module-button"
+                variant="ghost"
+                onClick={() => dashboardWorkspace.applyPreset('execution')}
+              >
+                Execution
+              </AppButton>
+              <AppButton
+                className="pv-module-button"
+                variant="secondary"
+                onClick={() => dashboardWorkspace.reset()}
+              >
+                Reset defaults
+              </AppButton>
             </div>
-          </AppCard>
+          </div>
 
-          <AppCard>
-            <SectionHeader
-              title="Exposure summary"
-              subtitle="Cash allocation, holdings concentration, and top position weight."
-              action={
-                <AppButtonLink href="/portfolio" variant="ghost">
-                  Portfolio detail
-                </AppButtonLink>
-              }
-            />
+          <div className="pv-dashboard-settings-block">
+            <span className="pv-kicker">Visible now</span>
+            <strong className="pv-dashboard-settings-value">
+              {primaryModules.length + secondaryModules.length} modules active
+            </strong>
+            <span className="pv-copy">
+              Primary lane: {primaryModules.length} · Secondary lane: {secondaryModules.length}
+            </span>
+          </div>
 
-            <div className="pv-exposure-bar" aria-hidden="true">
-              <span className="pv-exposure-segment cash" style={{ width: `${exposureSummary.cashWeight}%` }} />
-              <span className="pv-exposure-segment invested" style={{ width: `${exposureSummary.investedWeight}%` }} />
-            </div>
-
-            <div className="pv-grid two">
-              <div className="pv-chart-summary-card">
-                <span className="pv-kicker">Cash allocation</span>
-                <strong>{formatPercent(exposureSummary.cashWeight)}</strong>
-              </div>
-              <div className="pv-chart-summary-card">
-                <span className="pv-kicker">Invested allocation</span>
-                <strong>{formatPercent(exposureSummary.investedWeight)}</strong>
-              </div>
-              <div className="pv-chart-summary-card">
-                <span className="pv-kicker">Largest position</span>
-                <strong>
-                  {exposureSummary.topHolding
-                    ? `${exposureSummary.topHolding.symbol} · ${formatPercent(exposureSummary.topHoldingWeight)}`
-                    : 'No position yet'}
-                </strong>
-              </div>
-              <div className="pv-chart-summary-card">
-                <span className="pv-kicker">Top 3 concentration</span>
-                <strong>{formatPercent(exposureSummary.topThreeWeight)}</strong>
-              </div>
-            </div>
-
-            {topExposureHoldings.length ? (
-              <div className="pv-list">
-                {topExposureHoldings.map((holding) => (
-                  <Link
-                    key={holding.symbol}
-                    className="pv-list-row"
-                    href={`/stocks/${holding.symbol}?companyName=${encodeURIComponent(holding.companyName)}`}
-                  >
-                    <div className="pv-list-primary">
-                      <span className="pv-list-symbol">{holding.symbol}</span>
-                      <span className="pv-list-company">{holding.companyName}</span>
-                    </div>
-                    <div className="pv-list-secondary">
-                      <strong>{formatCurrency(holding.marketValue)}</strong>
-                      <span className="pv-kicker">
-                        {formatPercent(
-                          summary?.totalPortfolioValue
-                            ? (holding.marketValue / summary.totalPortfolioValue) * 100
-                            : 0
-                        )}
-                        {' '}of book
-                      </span>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                title="Exposure will appear after the first buy"
-                description="Once holdings exist, this panel will highlight concentration and capital balance."
-              />
-            )}
-          </AppCard>
-
-          <AppCard>
-            <SectionHeader
-              title="Active conditional orders"
-              subtitle="Target-price automation still armed against the live book."
-              action={
-                <AppButtonLink href="/orders" variant="ghost">
-                  Open orders
-                </AppButtonLink>
-              }
-            />
-            {conditionalOrdersQuery.isLoading ? (
-              <div className="pv-subgrid">
-                <div className="pv-skeleton" />
-                <div className="pv-skeleton" />
-              </div>
-            ) : conditionalOrdersQuery.isError ? (
-              <InlineNotice
-                tone="error"
-                message={webApi.getApiErrorMessage(conditionalOrdersQuery.error, 'Unable to load conditional orders')}
-              />
-            ) : activeConditionalOrders.length ? (
-              <div className="pv-list">
-                {activeConditionalOrders.slice(0, 3).map((order) => (
-                  <Link key={order.id} className="pv-list-row" href="/orders">
-                    <div className="pv-list-primary">
-                      <span className="pv-list-symbol-line">
-                        <span className="pv-list-symbol">{order.symbol}</span>
-                        <span className={`pv-chip ${order.side === 'BUY' ? 'buy' : 'sell'}`}>{order.side}</span>
-                        <span className="pv-chip neutral">{order.status}</span>
-                      </span>
-                      <span className="pv-list-company">
-                        Target {formatCurrency(order.targetPrice)} · {formatShares(order.quantity)} shares
-                      </span>
-                      <span className="pv-list-meta-line">
-                        <span>Created {formatDateTime(order.createdAt)}</span>
-                        <span>
-                          {order.lastCheckedPrice == null
-                            ? 'Waiting for first price check'
-                            : `Last check ${formatCurrency(order.lastCheckedPrice)}`}
-                        </span>
-                      </span>
-                    </div>
-                    <div className="pv-list-secondary">
-                      <strong>{order.executionKey}</strong>
-                      <span className="pv-kicker">
-                        {order.triggeredAt ? `Triggered ${formatDateTime(order.triggeredAt)}` : 'Still armed'}
-                      </span>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                title="No active conditional orders"
-                description="Create a target-price buy or sell order to turn the dashboard into a more automated command center."
-              />
-            )}
-          </AppCard>
-
-          <AppCard>
-            <SectionHeader
-              title="Holdings pulse"
-              subtitle="Open positions and unrealized performance."
-            />
-            {portfolioQuery.isLoading ? (
-              <div className="pv-subgrid">
-                <div className="pv-skeleton" />
-                <div className="pv-skeleton" />
-              </div>
-            ) : holdings.length ? (
-              <div className="pv-list">
-                {holdings.slice(0, 4).map((holding) => {
-                  const marketSession = getMarketSessionPresentation(holding.marketSession ?? 'CLOSED');
+          <div className="pv-dashboard-settings-block">
+            <span className="pv-kicker">Hidden modules</span>
+            {hiddenModules.length ? (
+              <div className="pv-hidden-module-row">
+                {hiddenModules.map((module) => {
+                  const meta = getDashboardModuleMeta(module.id);
 
                   return (
-                    <Link
-                      key={holding.symbol}
-                      className="pv-list-row"
-                      href={`/stocks/${holding.symbol}?companyName=${encodeURIComponent(holding.companyName)}`}
+                    <button
+                      key={module.id}
+                      className="pv-hidden-module-chip"
+                      type="button"
+                      onClick={() => dashboardWorkspace.toggleVisibility(module.id, true)}
                     >
-                      <div className="pv-list-primary">
-                        <span className="pv-list-symbol-line">
-                          <span className="pv-list-symbol">{holding.symbol}</span>
-                          <span className={`pv-chip ${getMarketSessionChipClass(holding.marketSession ?? 'CLOSED')}`}>
-                            {marketSession.statusLabel}
-                          </span>
-                          {getStaleQuoteBadge(holding.staleQuote) ? (
-                            <span className="pv-chip neutral">{getStaleQuoteBadge(holding.staleQuote)}</span>
-                          ) : null}
-                        </span>
-                        <span className="pv-list-company">{holding.companyName}</span>
-                        <span className="pv-list-meta-line">
-                          <span>{formatShares(holding.quantity)} shares</span>
-                          <span>Avg {formatCurrency(holding.averageCost)}</span>
-                        </span>
-                        {holding.quoteTimestamp ? (
-                          <span className="pv-list-meta-line">
-                            <span>{marketSession.priceLabel}</span>
-                            <span>{formatMarketTimestamp(holding.quoteTimestamp, holding.marketTimezone ?? undefined)}</span>
-                          </span>
-                        ) : null}
-                        {getStaleQuoteMessage(holding.staleQuote) ? (
-                          <span className="pv-kicker">{getStaleQuoteMessage(holding.staleQuote)}</span>
-                        ) : null}
-                      </div>
-                      <div className="pv-list-secondary">
-                        <strong>{formatCurrency(holding.marketValue)}</strong>
-                        <span className={holding.unrealizedPnl >= 0 ? 'pv-positive' : 'pv-negative'}>
-                          {formatSignedCurrency(holding.unrealizedPnl)} · {formatPercent(holding.unrealizedPnlPercent)}
-                        </span>
-                      </div>
-                    </Link>
+                      <strong>{meta.shortLabel}</strong>
+                      <span>Restore</span>
+                    </button>
                   );
                 })}
               </div>
             ) : (
-              <EmptyState
-                title="No holdings yet"
-                description="Place a simulated buy order from any stock detail page and positions will show up here."
-              />
+              <span className="pv-copy">No modules hidden right now.</span>
             )}
-          </AppCard>
+          </div>
+        </div>
+      </AppCard>
+
+      <section className="pv-command-center-grid">
+        <div className="pv-stack">
+          {primaryModules.length ? primaryModules.map(renderModule) : renderWorkspaceEmptyState('primary')}
+        </div>
+
+        <div className="pv-stack">
+          {secondaryModules.length ? secondaryModules.map(renderModule) : renderWorkspaceEmptyState('secondary')}
         </div>
       </section>
     </main>
