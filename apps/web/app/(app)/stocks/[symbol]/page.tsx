@@ -12,6 +12,12 @@ import { MetricCard } from '@/components/metric-card';
 import { SectionHeader } from '@/components/section-header';
 import { StockHistoryChart } from '@/components/stock-history-chart';
 import { getLiveFeedbackStatus } from '@/lib/live-feedback';
+import {
+  getStockResearchViewMeta,
+  getStockResearchViewModes,
+  sanitizeStockResearchViewMode,
+  type StockResearchViewMode,
+} from '@/lib/stock-research-layout';
 import { TradeOrderCard } from '@/components/trade-order-card';
 import { getStaleQuoteBadge, getStaleQuoteMessage } from '@/lib/market-data-freshness';
 import { liveQuoteRefreshOptions, QUOTE_AUTO_REFRESH_INTERVAL_MS } from '@/lib/market-data-refresh';
@@ -29,6 +35,7 @@ import {
 } from '@/lib/formatters';
 
 const preferredRangeStorageKey = 'pv-stock-history-range';
+const preferredResearchViewStorageKey = 'pv-stock-research-view';
 const validStockHistoryRanges = new Set<StockHistoryRange>(['1D', '1W', '1M', '3M', '1Y']);
 
 export default function StockDetailPage() {
@@ -39,6 +46,7 @@ export default function StockDetailPage() {
   const symbol = params.symbol;
   const companyName = searchParams.get('companyName') ?? undefined;
   const [historyRange, setHistoryRange] = useState<StockHistoryRange>('1M');
+  const [researchView, setResearchView] = useState<StockResearchViewMode>('split');
   const [historyRangeReady, setHistoryRangeReady] = useState(false);
 
   const detailQuery = useQuery({
@@ -223,6 +231,8 @@ export default function StockDetailPage() {
     isRefreshing: detailQuery.isFetching || portfolioQuery.isFetching,
     stale: quote.stale || Boolean(holding?.staleQuote),
   });
+  const activeResearchView = getStockResearchViewMeta(researchView);
+  const researchViews = getStockResearchViewModes();
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -233,6 +243,9 @@ export default function StockDetailPage() {
     if (isStockHistoryRange(savedRange) && savedRange !== historyRange) {
       setHistoryRange(savedRange);
     }
+    setResearchView(
+      sanitizeStockResearchViewMode(window.localStorage.getItem(preferredResearchViewStorageKey))
+    );
     setHistoryRangeReady(true);
   }, []);
 
@@ -242,11 +255,11 @@ export default function StockDetailPage() {
     }
 
     window.localStorage.setItem(preferredRangeStorageKey, historyRange);
-  }, [historyRange, historyRangeReady]);
+    window.localStorage.setItem(preferredResearchViewStorageKey, researchView);
+  }, [historyRange, historyRangeReady, researchView]);
 
   return (
-    <main className="pv-page pv-stock-layout">
-      <section className="pv-stack">
+    <main className="pv-page pv-stack">
         <AppCard className="strong pv-stock-hero-card">
           <div className="pv-stock-hero-head">
             <div className="pv-stock-identity">
@@ -317,31 +330,61 @@ export default function StockDetailPage() {
           {staleQuoteMessage ? <InlineNotice tone="info" message={staleQuoteMessage} /> : null}
         </AppCard>
 
-        <AppCard className="pv-chart-card">
-          <StockHistoryChart
-            range={historyRange}
-            history={historyQuery.data}
-            contextHistory={oneYearHistory}
-            symbol={quote.symbol}
-            loading={historyQuery.isLoading}
-            refreshing={historyQuery.isFetching && Boolean(historyQuery.data)}
-            errorMessage={chartErrorMessage}
-            onSelectRange={setHistoryRange}
-            researchActions={[
-              {
-                href: `/orders?symbol=${encodeURIComponent(symbol)}&side=${holding ? 'SELL' : 'BUY'}`,
-                label: holding ? 'Protect with target-price sell' : 'Queue target-price buy',
-              },
-              {
-                href: '/watchlist',
-                label: watchlistItem ? 'Review watchlist context' : 'Open watchlist workspace',
-              },
-            ]}
+        <AppCard className="pv-stock-workspace-card">
+          <SectionHeader
+            title="Research workspace"
+            subtitle="Switch between chart-led, balanced, and desk-style layouts without losing the same live market and account context."
           />
+          <div className="pv-stock-workspace-grid">
+            <div className="pv-stock-workspace-copy">
+              <span className="pv-kicker">Active view</span>
+              <strong>{activeResearchView.label}</strong>
+              <span>{activeResearchView.description}</span>
+            </div>
+            <div className="pv-stock-workspace-presets">
+              {researchViews.map((view) => (
+                <AppButton
+                  key={view.id}
+                  className="pv-stock-workspace-button"
+                  variant={view.id === researchView ? 'secondary' : 'ghost'}
+                  onClick={() => setResearchView(view.id)}
+                >
+                  {view.shortLabel}
+                </AppButton>
+              ))}
+            </div>
+            <div className="pv-stock-workspace-signature">
+              <span className="pv-chip neutral">Layout signature</span>
+              <span>{activeResearchView.signature}</span>
+            </div>
+          </div>
         </AppCard>
 
-        <div className="pv-grid two">
-          <AppCard>
+        <section className={`pv-stock-research-layout ${researchView}`}>
+          <AppCard className="pv-chart-card pv-stock-panel pv-stock-panel-chart">
+            <StockHistoryChart
+              range={historyRange}
+              history={historyQuery.data}
+              contextHistory={oneYearHistory}
+              symbol={quote.symbol}
+              loading={historyQuery.isLoading}
+              refreshing={historyQuery.isFetching && Boolean(historyQuery.data)}
+              errorMessage={chartErrorMessage}
+              onSelectRange={setHistoryRange}
+              researchActions={[
+                {
+                  href: `/orders?symbol=${encodeURIComponent(symbol)}&side=${holding ? 'SELL' : 'BUY'}`,
+                  label: holding ? 'Protect with target-price sell' : 'Queue target-price buy',
+                },
+                {
+                  href: '/watchlist',
+                  label: watchlistItem ? 'Review watchlist context' : 'Open watchlist workspace',
+                },
+              ]}
+            />
+          </AppCard>
+
+          <AppCard className="pv-stock-panel pv-stock-panel-quote">
             <SectionHeader
               title="Quote summary"
               subtitle="Current session context and key quote marks."
@@ -405,7 +448,7 @@ export default function StockDetailPage() {
             </div>
           </AppCard>
 
-          <AppCard>
+          <AppCard className="pv-stock-panel pv-stock-panel-position">
             <SectionHeader
               title="Position summary"
               subtitle="Holding state and sizing context from the backend."
@@ -449,15 +492,11 @@ export default function StockDetailPage() {
               </div>
             </div>
           </AppCard>
-        </div>
-      </section>
 
-      <section className="pv-stack pv-stock-sidebar">
-        {secondaryErrorMessage ? (
-          <InlineNotice tone="error" message={secondaryErrorMessage} />
-        ) : null}
-
-        <AppCard>
+          <AppCard className="pv-stock-panel pv-stock-panel-context">
+            {secondaryErrorMessage ? (
+              <InlineNotice tone="error" message={secondaryErrorMessage} />
+            ) : null}
           <SectionHeader
             title="Trade context"
             subtitle="Live account state, sizing room, and session rules before you send an order."
@@ -520,93 +559,97 @@ export default function StockDetailPage() {
           </div>
         </AppCard>
 
-        <TradeOrderCard
-          symbol={symbol}
-          side="BUY"
-          title="Buy shares"
-          subtitle="See how cash, size, and concentration shift before opening or adding exposure."
-          submitLabel="Place buy order"
-          currentPrice={currentPrice}
-          cashBalance={cashBalance}
-          totalPortfolioValue={totalPortfolioValue}
-          holdingQuantity={holding?.quantity ?? 0}
-          holdingAverageCost={holding?.averageCost ?? 0}
-          holdingMarketValue={holdingMarketValue}
-          availableLabel="Available cash"
-          availableValue={formatCurrency(cashBalance)}
-          supportLabel="Execution source"
-          supportValue="Current backend quote"
-          followThroughAction={{
-            href: `/orders?symbol=${encodeURIComponent(symbol)}&side=SELL`,
-            label: 'Plan a target-price exit',
-            copy: 'Turn this entry into a complete trade plan by queuing a protective or profit-taking sell order.',
-          }}
-          pending={buyMutation.isPending}
-          externalBlockingMessage={tradingBlockedMessage}
-          errorMessage={
-            buyMutation.isError
-              ? webApi.getApiErrorMessage(buyMutation.error, 'Unable to place buy order')
-              : null
-          }
-          successMessage={
-            buyMutation.isSuccess
-              ? 'Buy order simulated successfully.'
-              : null
-          }
-          getBlockingMessage={(quantity) =>
-            quantity * currentPrice > cashBalance
-              ? 'This estimated order is larger than your available virtual cash.'
-              : null
-          }
-          onSubmitQuantity={async (quantity) => {
-            await buyMutation.mutateAsync({ quantity });
-          }}
-        />
+          <div className="pv-stock-panel pv-stock-panel-buy">
+            <TradeOrderCard
+              symbol={symbol}
+              side="BUY"
+              title="Buy shares"
+              subtitle="See how cash, size, and concentration shift before opening or adding exposure."
+              submitLabel="Place buy order"
+              currentPrice={currentPrice}
+              cashBalance={cashBalance}
+              totalPortfolioValue={totalPortfolioValue}
+              holdingQuantity={holding?.quantity ?? 0}
+              holdingAverageCost={holding?.averageCost ?? 0}
+              holdingMarketValue={holdingMarketValue}
+              availableLabel="Available cash"
+              availableValue={formatCurrency(cashBalance)}
+              supportLabel="Execution source"
+              supportValue="Current backend quote"
+              followThroughAction={{
+                href: `/orders?symbol=${encodeURIComponent(symbol)}&side=SELL`,
+                label: 'Plan a target-price exit',
+                copy: 'Turn this entry into a complete trade plan by queuing a protective or profit-taking sell order.',
+              }}
+              pending={buyMutation.isPending}
+              externalBlockingMessage={tradingBlockedMessage}
+              errorMessage={
+                buyMutation.isError
+                  ? webApi.getApiErrorMessage(buyMutation.error, 'Unable to place buy order')
+                  : null
+              }
+              successMessage={
+                buyMutation.isSuccess
+                  ? 'Buy order simulated successfully.'
+                  : null
+              }
+              getBlockingMessage={(quantity) =>
+                quantity * currentPrice > cashBalance
+                  ? 'This estimated order is larger than your available virtual cash.'
+                  : null
+              }
+              onSubmitQuantity={async (quantity) => {
+                await buyMutation.mutateAsync({ quantity });
+              }}
+            />
+          </div>
 
-        <TradeOrderCard
-          symbol={symbol}
-          side="SELL"
-          title="Sell shares"
-          subtitle="Preview the cash release, remaining exposure, and realized component before trimming or exiting."
-          submitLabel="Place sell order"
-          currentPrice={currentPrice}
-          cashBalance={cashBalance}
-          totalPortfolioValue={totalPortfolioValue}
-          holdingQuantity={availableToSell}
-          holdingAverageCost={holding?.averageCost ?? 0}
-          holdingMarketValue={holdingMarketValue}
-          availableLabel="Shares available"
-          availableValue={formatShares(availableToSell)}
-          supportLabel="Position source"
-          supportValue="Current backend holdings"
-          followThroughAction={{
-            href: `/orders?symbol=${encodeURIComponent(symbol)}&side=BUY`,
-            label: 'Queue a re-entry buy',
-            copy: 'If this is only a trim or exit plan, stage a target-price buy so the symbol stays inside your execution workflow.',
-          }}
-          buttonVariant="secondary"
-          pending={sellMutation.isPending}
-          externalBlockingMessage={tradingBlockedMessage}
-          errorMessage={
-            sellMutation.isError
-              ? webApi.getApiErrorMessage(sellMutation.error, 'Unable to place sell order')
-              : null
-          }
-          successMessage={
-            sellMutation.isSuccess
-              ? 'Sell order simulated successfully.'
-              : null
-          }
-          getBlockingMessage={(quantity) =>
-            quantity > availableToSell
-              ? 'You cannot sell more shares than the backend reports in your holdings.'
-              : null
-          }
-          onSubmitQuantity={async (quantity) => {
-            await sellMutation.mutateAsync({ quantity });
-          }}
-        />
-      </section>
+          <div className="pv-stock-panel pv-stock-panel-sell">
+            <TradeOrderCard
+              symbol={symbol}
+              side="SELL"
+              title="Sell shares"
+              subtitle="Preview the cash release, remaining exposure, and realized component before trimming or exiting."
+              submitLabel="Place sell order"
+              currentPrice={currentPrice}
+              cashBalance={cashBalance}
+              totalPortfolioValue={totalPortfolioValue}
+              holdingQuantity={availableToSell}
+              holdingAverageCost={holding?.averageCost ?? 0}
+              holdingMarketValue={holdingMarketValue}
+              availableLabel="Shares available"
+              availableValue={formatShares(availableToSell)}
+              supportLabel="Position source"
+              supportValue="Current backend holdings"
+              followThroughAction={{
+                href: `/orders?symbol=${encodeURIComponent(symbol)}&side=BUY`,
+                label: 'Queue a re-entry buy',
+                copy: 'If this is only a trim or exit plan, stage a target-price buy so the symbol stays inside your execution workflow.',
+              }}
+              buttonVariant="secondary"
+              pending={sellMutation.isPending}
+              externalBlockingMessage={tradingBlockedMessage}
+              errorMessage={
+                sellMutation.isError
+                  ? webApi.getApiErrorMessage(sellMutation.error, 'Unable to place sell order')
+                  : null
+              }
+              successMessage={
+                sellMutation.isSuccess
+                  ? 'Sell order simulated successfully.'
+                  : null
+              }
+              getBlockingMessage={(quantity) =>
+                quantity > availableToSell
+                  ? 'You cannot sell more shares than the backend reports in your holdings.'
+                  : null
+              }
+              onSubmitQuantity={async (quantity) => {
+                await sellMutation.mutateAsync({ quantity });
+              }}
+            />
+          </div>
+        </section>
     </main>
   );
 }

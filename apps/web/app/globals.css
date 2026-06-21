@@ -681,6 +681,114 @@ input {
   flex-wrap: wrap;
 }
 
+.pv-stock-workspace-card {
+  display: grid;
+  gap: 16px;
+}
+
+.pv-stock-workspace-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.9fr) minmax(280px, 1.05fr) minmax(200px, 0.9fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.pv-stock-workspace-copy,
+.pv-stock-workspace-signature {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.pv-stock-workspace-copy strong {
+  font-size: 1.05rem;
+  line-height: 1.2;
+}
+
+.pv-stock-workspace-copy span:last-child,
+.pv-stock-workspace-signature span:last-child {
+  color: var(--pv-color-text-secondary);
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.pv-stock-workspace-presets {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.pv-stock-workspace-button {
+  min-height: 38px;
+  min-width: 96px;
+  font-size: 0.8rem;
+}
+
+.pv-stock-research-layout {
+  display: grid;
+  gap: var(--pv-space-lg);
+  align-items: start;
+}
+
+.pv-stock-panel {
+  min-width: 0;
+}
+
+.pv-stock-panel-chart {
+  grid-area: chart;
+}
+
+.pv-stock-panel-quote {
+  grid-area: quote;
+}
+
+.pv-stock-panel-position {
+  grid-area: position;
+}
+
+.pv-stock-panel-context {
+  grid-area: context;
+}
+
+.pv-stock-panel-buy {
+  grid-area: buy;
+}
+
+.pv-stock-panel-sell {
+  grid-area: sell;
+}
+
+.pv-stock-panel .pv-trade-ticket {
+  min-height: 100%;
+}
+
+.pv-stock-research-layout.focus {
+  grid-template-columns: minmax(0, 1.42fr) minmax(320px, 0.96fr);
+  grid-template-areas:
+    "chart context"
+    "chart buy"
+    "quote position"
+    "sell sell";
+}
+
+.pv-stock-research-layout.split {
+  grid-template-columns: minmax(0, 1.12fr) minmax(0, 1.04fr) minmax(320px, 0.9fr);
+  grid-template-areas:
+    "chart chart context"
+    "chart chart buy"
+    "quote position sell";
+}
+
+.pv-stock-research-layout.desk {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-areas:
+    "chart chart quote"
+    "chart chart position"
+    "context buy sell";
+}
+
 .pv-live-readout,
 .pv-live-inline,
 .pv-live-status-chipline {
@@ -2090,6 +2198,23 @@ input {
   .pv-decision-support-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .pv-stock-workspace-grid,
+  .pv-stock-research-layout.focus,
+  .pv-stock-research-layout.split,
+  .pv-stock-research-layout.desk {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pv-stock-research-layout.focus,
+  .pv-stock-research-layout.split,
+  .pv-stock-research-layout.desk {
+    grid-template-areas:
+      "chart chart"
+      "quote position"
+      "context context"
+      "buy sell";
+  }
 }
 
 @media (max-width: 980px) {
@@ -2133,6 +2258,25 @@ input {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .pv-stock-workspace-grid,
+  .pv-stock-research-layout.focus,
+  .pv-stock-research-layout.split,
+  .pv-stock-research-layout.desk {
+    grid-template-columns: 1fr;
+  }
+
+  .pv-stock-research-layout.focus,
+  .pv-stock-research-layout.split,
+  .pv-stock-research-layout.desk {
+    grid-template-areas:
+      "chart"
+      "quote"
+      "position"
+      "context"
+      "buy"
+      "sell";
+  }
+
   .pv-chart-toolbar,
   .pv-dashboard-hero-head,
   .pv-stock-hero-head,
@@ -2153,7 +2297,8 @@ input {
     justify-content: flex-start;
   }
 
-  .pv-module-controls {
+  .pv-module-controls,
+  .pv-stock-workspace-presets {
     justify-content: flex-start;
   }
 
@@ -2172,7 +2317,8 @@ input {
   }
 
   .pv-workspace-controls,
-  .pv-workspace-select-wrap {
+  .pv-workspace-select-wrap,
+  .pv-stock-workspace-signature {
     width: 100%;
   }
 
