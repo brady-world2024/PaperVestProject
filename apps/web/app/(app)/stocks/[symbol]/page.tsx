@@ -125,8 +125,15 @@ export default function StockDetailPage() {
   const holding = portfolioQuery.data?.holdings.find((item) => item.symbol === symbol);
   const isWatchlisted = Boolean(watchlistItem);
   const currentPrice = quote?.currentPrice ?? 0;
-  const cashBalance = portfolioQuery.data?.summary.cashBalance ?? 0;
+  const portfolioSummary = portfolioQuery.data?.summary;
+  const cashBalance = portfolioSummary?.cashBalance ?? 0;
+  const totalPortfolioValue = portfolioSummary?.totalPortfolioValue ?? 0;
   const availableToSell = holding?.quantity ?? 0;
+  const holdingMarketValue = holding?.marketValue ?? 0;
+  const currentPositionWeight =
+    totalPortfolioValue > 0 ? (holdingMarketValue / totalPortfolioValue) * 100 : 0;
+  const maxAffordableShares =
+    currentPrice > 0 ? Math.floor((cashBalance / currentPrice) * 10_000) / 10_000 : 0;
   const detailErrorMessage = detailQuery.isError
     ? webApi.getApiErrorMessage(detailQuery.error, 'Unable to load this stock right now')
     : null;
@@ -403,41 +410,75 @@ export default function StockDetailPage() {
         ) : null}
 
         <AppCard>
-          <SectionHeader title="Trade" />
-            <div className="pv-meta-row">
-              <span className="pv-kicker">{marketSession.priceLabel}</span>
-              <strong>{formatCurrency(currentPrice)}</strong>
+          <SectionHeader
+            title="Trade context"
+            subtitle="Live account state, sizing room, and session rules before you send an order."
+          />
+          <div className="pv-trade-context-panel">
+            <div className="pv-trade-context-strip">
+              <div className="pv-trade-context-chip">
+                <span className="pv-kicker">Session</span>
+                <strong>{marketSession.statusLabel}</strong>
+              </div>
+              <div className="pv-trade-context-chip">
+                <span className="pv-kicker">Current mark</span>
+                <strong>{formatCurrency(currentPrice)}</strong>
+              </div>
+              <div className="pv-trade-context-chip">
+                <span className="pv-kicker">Max buy size</span>
+                <strong>{formatShares(maxAffordableShares)}</strong>
+              </div>
             </div>
-            <div className="pv-meta-row">
-              <span className="pv-kicker">Market session</span>
-              <strong>{marketSession.statusLabel}</strong>
-            </div>
+
             <div className="pv-meta-row">
               <span className="pv-kicker">Cash available</span>
               <strong>{formatCurrency(cashBalance)}</strong>
             </div>
-          <div className="pv-meta-row">
-            <span className="pv-kicker">Shares available</span>
-            <strong>{formatShares(availableToSell)}</strong>
-          </div>
+            <div className="pv-meta-row">
+              <span className="pv-kicker">Shares available</span>
+              <strong>{formatShares(availableToSell)}</strong>
+            </div>
+            <div className="pv-meta-row">
+              <span className="pv-kicker">Current position weight</span>
+              <strong>{holding ? `${currentPositionWeight.toFixed(1)}%` : 'No position'}</strong>
+            </div>
             <div className="pv-meta-row">
               <span className="pv-kicker">Quote timestamp</span>
               <strong>{formatMarketTimestamp(quote.quoteTimestamp, quote.marketTimezone)}</strong>
             </div>
+            <div className="pv-trade-context-note">
+              <strong>Execution assumption</strong>
+              <span>
+                Preview math uses the current backend quote and current holdings state. Final results still depend on the quote returned when the order is submitted.
+              </span>
+            </div>
             {tradingBlockedMessage ? (
               <InlineNotice tone="info" message={tradingBlockedMessage} />
             ) : null}
-          </AppCard>
+          </div>
+        </AppCard>
 
         <TradeOrderCard
+          symbol={symbol}
+          side="BUY"
           title="Buy shares"
+          subtitle="See how cash, size, and concentration shift before opening or adding exposure."
           submitLabel="Place buy order"
           currentPrice={currentPrice}
+          cashBalance={cashBalance}
+          totalPortfolioValue={totalPortfolioValue}
+          holdingQuantity={holding?.quantity ?? 0}
+          holdingAverageCost={holding?.averageCost ?? 0}
+          holdingMarketValue={holdingMarketValue}
           availableLabel="Available cash"
           availableValue={formatCurrency(cashBalance)}
-          estimateLabel="Estimated total"
           supportLabel="Execution source"
           supportValue="Current backend quote"
+          followThroughAction={{
+            href: `/orders?symbol=${encodeURIComponent(symbol)}&side=SELL`,
+            label: 'Plan a target-price exit',
+            copy: 'Turn this entry into a complete trade plan by queuing a protective or profit-taking sell order.',
+          }}
           pending={buyMutation.isPending}
           externalBlockingMessage={tradingBlockedMessage}
           errorMessage={
@@ -461,14 +502,26 @@ export default function StockDetailPage() {
         />
 
         <TradeOrderCard
+          symbol={symbol}
+          side="SELL"
           title="Sell shares"
+          subtitle="Preview the cash release, remaining exposure, and realized component before trimming or exiting."
           submitLabel="Place sell order"
           currentPrice={currentPrice}
+          cashBalance={cashBalance}
+          totalPortfolioValue={totalPortfolioValue}
+          holdingQuantity={availableToSell}
+          holdingAverageCost={holding?.averageCost ?? 0}
+          holdingMarketValue={holdingMarketValue}
           availableLabel="Shares available"
           availableValue={formatShares(availableToSell)}
-          estimateLabel="Estimated proceeds"
           supportLabel="Position source"
           supportValue="Current backend holdings"
+          followThroughAction={{
+            href: `/orders?symbol=${encodeURIComponent(symbol)}&side=BUY`,
+            label: 'Queue a re-entry buy',
+            copy: 'If this is only a trim or exit plan, stage a target-price buy so the symbol stays inside your execution workflow.',
+          }}
           buttonVariant="secondary"
           pending={sellMutation.isPending}
           externalBlockingMessage={tradingBlockedMessage}
