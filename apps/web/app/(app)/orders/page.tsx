@@ -23,6 +23,7 @@ import {
   conditionalOrderStatusTone,
 } from '@/lib/conditional-orders/presentation';
 import { queryKeys } from '@/lib/query-keys';
+import { getConditionalOrderAuditSummary } from '@/lib/trust-audit';
 import { webApi } from '@/lib/api';
 import { useWorkspaceDensity } from '@/lib/use-workspace-density';
 import {
@@ -144,6 +145,7 @@ export default function OrdersPage() {
   });
 
   const orders = ordersQuery.data?.orders ?? [];
+  const orderAuditSummary = getConditionalOrderAuditSummary(orders);
   const visibleOrders = sortConditionalOrders(filterConditionalOrders(orders, orderFilter), orderSort);
   const activeCount = orders.filter((order) => order.status === 'ACTIVE').length;
   const pendingCount = orders.filter(
@@ -267,6 +269,44 @@ export default function OrdersPage() {
             <span className="pv-kicker">Trigger rule</span>
             <strong>{selectedSide === 'BUY' ? 'Market price <= target' : 'Market price >= target'}</strong>
           </div>
+          <div className="pv-trust-grid">
+            <div className="pv-trust-card">
+              <span className="pv-trust-label">Active execution keys</span>
+              <strong className="pv-trust-value">{orderAuditSummary.activeExecutionKeys}</strong>
+              <span className="pv-trust-copy">
+                Every live automation still carries a concrete backend execution key.
+              </span>
+            </div>
+            <div className="pv-trust-card">
+              <span className="pv-trust-label">Monitored symbols</span>
+              <strong className="pv-trust-value">{orderAuditSummary.monitoredSymbolsCount}</strong>
+              <span className="pv-trust-copy">
+                Automation is currently spread across this many tracked names.
+              </span>
+            </div>
+            <div className="pv-trust-card">
+              <span className="pv-trust-label">Failed runs</span>
+              <strong className="pv-trust-value">{orderAuditSummary.failureCount}</strong>
+              <span className="pv-trust-copy">
+                Failed automations stay visible instead of disappearing from the audit trail.
+              </span>
+            </div>
+            <div className="pv-trust-card">
+              <span className="pv-trust-label">Latest lifecycle write</span>
+              <strong className="pv-trust-value">
+                {orderAuditSummary.latestLifecycleAt
+                  ? formatDateTime(orderAuditSummary.latestLifecycleAt)
+                  : 'No lifecycle yet'}
+              </strong>
+              <span className="pv-trust-copy">
+                The newest order state transition stays readable alongside the live blotter.
+              </span>
+            </div>
+          </div>
+          <div className="pv-meta-row">
+            <span className="pv-kicker">Latest failure code</span>
+            <strong>{orderAuditSummary.latestFailureCode ?? 'No failure recorded'}</strong>
+          </div>
         </AppCard>
       </section>
 
@@ -382,6 +422,16 @@ export default function OrdersPage() {
                             <span>Trigger</span>
                             <span>{order.side === 'BUY' ? 'Market price <= target' : 'Market price >= target'}</span>
                           </span>
+                          <span className="pv-list-meta-line">
+                            <span>Version</span>
+                            <span>v{order.version} · Updated {formatDateTime(order.updatedAt)}</span>
+                          </span>
+                          {order.failureCode ? (
+                            <span className="pv-list-meta-line">
+                              <span>Failure code</span>
+                              <span>{order.failureCode}</span>
+                            </span>
+                          ) : null}
                           {failureSummary ? <span className="pv-kicker">{failureSummary}</span> : null}
                         </>
                       ) : null}

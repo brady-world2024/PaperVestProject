@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/empty-state';
 import { InlineNotice } from '@/components/inline-notice';
 import { SectionHeader } from '@/components/section-header';
 import { queryKeys } from '@/lib/query-keys';
+import { getExecutionAuditSummary } from '@/lib/trust-audit';
 import { webApi } from '@/lib/api';
 import { useWorkspaceDensity } from '@/lib/use-workspace-density';
 import { sortTrades, type TradeSort } from '@/lib/workspace-grids';
@@ -27,7 +28,9 @@ export default function ActivityPage() {
     queryKey: queryKeys.tradeHistory,
     queryFn: webApi.getTradeHistory,
   });
-  const trades = sortTrades(historyQuery.data?.trades ?? [], sort);
+  const allTrades = historyQuery.data?.trades ?? [];
+  const trades = sortTrades(allTrades, sort);
+  const executionAuditSummary = getExecutionAuditSummary(allTrades);
 
   return (
     <main className="pv-page pv-stack">
@@ -37,6 +40,53 @@ export default function ActivityPage() {
         <p className="pv-copy inverse">
           Every simulated buy and sell is listed here with execution price, gross amount, realized P&amp;L, and timestamp from the backend record.
         </p>
+      </section>
+
+      <section className="pv-card">
+        <SectionHeader
+          title="Execution trust rail"
+          subtitle="Read execution history as a ledger with replay posture, concrete trade IDs, and visible latest-write timing."
+        />
+        <div className="pv-trust-grid">
+          <div className="pv-trust-card">
+            <span className="pv-trust-label">Latest execution</span>
+            <strong className="pv-trust-value">
+              {executionAuditSummary.latestExecutionAt
+                ? formatDateTime(executionAuditSummary.latestExecutionAt)
+                : 'No fill yet'}
+            </strong>
+            <span className="pv-trust-copy">
+              The freshest backend execution timestamp anchors the current top of the ledger.
+            </span>
+          </div>
+          <div className="pv-trust-card">
+            <span className="pv-trust-label">Latest trade ID</span>
+            <strong className="pv-trust-value">{executionAuditSummary.latestTradeId ?? 'No ID yet'}</strong>
+            <span className="pv-trust-copy">
+              Trade IDs stay visible so every row can be discussed as a concrete ledger event.
+            </span>
+          </div>
+          <div className="pv-trust-card">
+            <span className="pv-trust-label">Replay-safe fills</span>
+            <strong className="pv-trust-value">{executionAuditSummary.verifiedFillCount}</strong>
+            <span className="pv-trust-copy">
+              These rows were recorded as primary executions rather than idempotent replays.
+            </span>
+          </div>
+          <div className="pv-trust-card">
+            <span className="pv-trust-label">Replay events</span>
+            <strong className="pv-trust-value">{executionAuditSummary.replayCount}</strong>
+            <span className="pv-trust-copy">
+              Replays remain visible instead of being silently merged away from the audit story.
+            </span>
+          </div>
+        </div>
+        <div className="pv-audit-note">
+          <strong>Ledger discipline</strong>
+          <span>
+            This page keeps the execution record separate from portfolio math, so you can audit fills before interpreting account-level P&amp;L.
+          </span>
+        </div>
       </section>
 
       <section className="pv-card">
@@ -113,22 +163,31 @@ export default function ActivityPage() {
               <span>Executed</span>
             </div>
             {trades.map((trade) => (
-              <div className={`pv-workspace-row ${density}`} key={trade.tradeId}>
-                <div className="pv-workspace-cell primary">
-                  <span className="pv-list-symbol-line">
-                    <span className="pv-list-symbol">{trade.symbol}</span>
-                    <span className={`pv-chip ${trade.side === 'BUY' ? 'buy' : 'sell'}`}>
-                      {trade.side}
+                <div className={`pv-workspace-row ${density}`} key={trade.tradeId}>
+                  <div className="pv-workspace-cell primary">
+                    <span className="pv-list-symbol-line">
+                      <span className="pv-list-symbol">{trade.symbol}</span>
+                      <span className={`pv-chip ${trade.side === 'BUY' ? 'buy' : 'sell'}`}>
+                        {trade.side}
+                      </span>
+                      <span className={`pv-chip ${trade.idempotentReplay ? 'neutral' : 'positive'}`}>
+                        {trade.idempotentReplay ? 'Replay' : 'Primary fill'}
+                      </span>
                     </span>
-                  </span>
-                  <span className="pv-list-company">{trade.companyName}</span>
-                  {density === 'comfortable' ? (
-                    <span className="pv-list-meta-line">
-                      <span>Trade ID</span>
-                      <span>{trade.tradeId}</span>
-                    </span>
-                  ) : null}
-                </div>
+                    <span className="pv-list-company">{trade.companyName}</span>
+                    {density === 'comfortable' ? (
+                      <>
+                        <span className="pv-list-meta-line">
+                          <span>Trade ID</span>
+                          <span>{trade.tradeId}</span>
+                        </span>
+                        <span className="pv-list-meta-line">
+                          <span>Audit posture</span>
+                          <span>{trade.idempotentReplay ? 'Idempotent replay' : 'Primary execution'}</span>
+                        </span>
+                      </>
+                    ) : null}
+                  </div>
                 <div className="pv-workspace-cell numeric">
                   <strong>{formatShares(trade.quantity)}</strong>
                 </div>

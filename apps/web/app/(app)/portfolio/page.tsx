@@ -17,6 +17,10 @@ import { getStaleQuoteBadge, getStaleQuoteMessage } from '@/lib/market-data-fres
 import { liveQuoteRefreshOptions } from '@/lib/market-data-refresh';
 import { getMarketSessionChipClass } from '@/lib/market-session';
 import { queryKeys } from '@/lib/query-keys';
+import {
+  getPortfolioSnapshotSourceLabel,
+  getPortfolioTrustSummary,
+} from '@/lib/trust-audit';
 import { webApi } from '@/lib/api';
 import {
   formatCurrency,
@@ -51,9 +55,15 @@ export default function PortfolioPage() {
     placeholderData: (previousData) => previousData,
   });
 
+  const allTrades = historyQuery.data?.trades ?? [];
   const summary = portfolioQuery.data?.summary;
   const holdings = sortHoldings(portfolioQuery.data?.holdings ?? [], holdingSort);
-  const recentTrades = sortTrades(historyQuery.data?.trades ?? [], tradeSort).slice(0, 6);
+  const recentTrades = sortTrades(allTrades, tradeSort).slice(0, 6);
+  const portfolioTrustSummary = getPortfolioTrustSummary({
+    holdings: portfolioQuery.data?.holdings ?? [],
+    historyPoints: portfolioHistoryQuery.data?.points ?? [],
+    trades: allTrades,
+  });
   const portfolioHistoryErrorMessage = portfolioHistoryQuery.isError
     ? webApi.getApiErrorMessage(portfolioHistoryQuery.error, 'Unable to load portfolio history right now')
     : null;
@@ -109,6 +119,22 @@ export default function PortfolioPage() {
             <span className="pv-kicker">Total return</span>
             <strong className={(summary?.totalReturnPercent ?? 0) >= 0 ? 'pv-positive' : 'pv-negative'}>
               {summary ? formatPercent(summary.totalReturnPercent) : '...'}
+            </strong>
+          </div>
+          <div className="pv-meta-row">
+            <span className="pv-kicker">Latest holdings quote</span>
+            <strong>
+              {portfolioTrustSummary.latestQuoteTimestamp
+                ? formatDateTime(portfolioTrustSummary.latestQuoteTimestamp)
+                : 'Waiting for quotes'}
+            </strong>
+          </div>
+          <div className="pv-meta-row">
+            <span className="pv-kicker">Latest portfolio snapshot</span>
+            <strong>
+              {portfolioTrustSummary.latestSnapshotTimestamp
+                ? formatDateTime(portfolioTrustSummary.latestSnapshotTimestamp)
+                : 'No snapshot yet'}
             </strong>
           </div>
           <div className="pv-action-cluster" style={{ marginTop: '18px' }}>
@@ -365,26 +391,66 @@ export default function PortfolioPage() {
 
           <AppCard>
             <SectionHeader
-              title="Portfolio math"
-              subtitle="Shared backend account metrics."
+              title="Trust and valuation audit"
+              subtitle="Read how backend snapshots, holdings quotes, and execution ledger entries currently support this portfolio view."
             />
-            <div className="pv-meta-row">
-              <span className="pv-kicker">Holdings count</span>
-              <strong>{holdings.length}</strong>
+            <div className="pv-trust-grid">
+              <div className="pv-trust-card">
+                <span className="pv-trust-label">Snapshot source</span>
+                <strong className="pv-trust-value">
+                  {getPortfolioSnapshotSourceLabel(portfolioTrustSummary.latestSnapshotSource)}
+                </strong>
+                <span className="pv-trust-copy">
+                  Portfolio history currently advances from trade-driven account snapshots.
+                </span>
+              </div>
+              <div className="pv-trust-card">
+                <span className="pv-trust-label">Holdings tracked</span>
+                <strong className="pv-trust-value">{portfolioTrustSummary.trackedHoldingsCount}</strong>
+                <span className="pv-trust-copy">
+                  Each position is enriched with the latest backend-managed quote state.
+                </span>
+              </div>
+              <div className="pv-trust-card">
+                <span className="pv-trust-label">Stale quotes</span>
+                <strong className="pv-trust-value">{portfolioTrustSummary.staleQuoteCount}</strong>
+                <span className="pv-trust-copy">
+                  Cached quotes stay visible, but they are counted explicitly here instead of being hidden.
+                </span>
+              </div>
+              <div className="pv-trust-card">
+                <span className="pv-trust-label">Latest ledger link</span>
+                <strong className="pv-trust-value">
+                  {portfolioTrustSummary.latestLedgerTradeId ?? 'No trade yet'}
+                </strong>
+                <span className="pv-trust-copy">
+                  The freshest trade ID links account valuation back to a concrete execution record.
+                </span>
+              </div>
             </div>
             <div className="pv-meta-row">
-              <span className="pv-kicker">Cash balance</span>
-              <strong>{summary ? formatCurrency(summary.cashBalance) : '...'}</strong>
-            </div>
-            <div className="pv-meta-row">
-              <span className="pv-kicker">Holdings market value</span>
-              <strong>{summary ? formatCurrency(summary.holdingsMarketValue) : '...'}</strong>
-            </div>
-            <div className="pv-meta-row">
-              <span className="pv-kicker">Daily change</span>
-              <strong className={(summary?.dailyChange ?? 0) >= 0 ? 'pv-positive' : 'pv-negative'}>
-                {summary ? formatSignedCurrency(summary.dailyChange) : '...'}
+              <span className="pv-kicker">Latest snapshot timestamp</span>
+              <strong>
+                {portfolioTrustSummary.latestSnapshotTimestamp
+                  ? formatDateTime(portfolioTrustSummary.latestSnapshotTimestamp)
+                  : 'Awaiting first snapshot'}
               </strong>
+            </div>
+            <div className="pv-meta-row">
+              <span className="pv-kicker">Latest holdings quote timestamp</span>
+              <strong>
+                {portfolioTrustSummary.latestQuoteTimestamp
+                  ? formatDateTime(portfolioTrustSummary.latestQuoteTimestamp)
+                  : 'Awaiting first quote'}
+              </strong>
+            </div>
+            <div className="pv-meta-row">
+              <span className="pv-kicker">Latest ledger trade</span>
+              <strong>{portfolioTrustSummary.latestLedgerTradeId ?? 'No ledger entry yet'}</strong>
+            </div>
+            <div className="pv-meta-row">
+              <span className="pv-kicker">Audit note</span>
+              <strong>Quotes, trade history, and snapshots are shown as distinct provenance layers.</strong>
             </div>
           </AppCard>
         </div>
