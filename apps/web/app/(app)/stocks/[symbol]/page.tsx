@@ -162,6 +162,30 @@ export default function StockDetailPage() {
       ? webApi.getApiErrorMessage(watchlistQuery.error, 'Unable to load watchlist state')
       : null;
 
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const savedRange = window.localStorage.getItem(preferredRangeStorageKey);
+    if (isStockHistoryRange(savedRange) && savedRange !== historyRange) {
+      setHistoryRange(savedRange);
+    }
+    setResearchView(
+      sanitizeStockResearchViewMode(window.localStorage.getItem(preferredResearchViewStorageKey))
+    );
+    setHistoryRangeReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !historyRangeReady) {
+      return;
+    }
+
+    window.localStorage.setItem(preferredRangeStorageKey, historyRange);
+    window.localStorage.setItem(preferredResearchViewStorageKey, researchView);
+  }, [historyRange, historyRangeReady, researchView]);
+
   if (detailQuery.isLoading) {
     return (
       <main className="pv-page pv-stock-layout">
@@ -233,30 +257,6 @@ export default function StockDetailPage() {
   });
   const activeResearchView = getStockResearchViewMeta(researchView);
   const researchViews = getStockResearchViewModes();
-
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    const savedRange = window.localStorage.getItem(preferredRangeStorageKey);
-    if (isStockHistoryRange(savedRange) && savedRange !== historyRange) {
-      setHistoryRange(savedRange);
-    }
-    setResearchView(
-      sanitizeStockResearchViewMode(window.localStorage.getItem(preferredResearchViewStorageKey))
-    );
-    setHistoryRangeReady(true);
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !historyRangeReady) {
-      return;
-    }
-
-    window.localStorage.setItem(preferredRangeStorageKey, historyRange);
-    window.localStorage.setItem(preferredResearchViewStorageKey, researchView);
-  }, [historyRange, historyRangeReady, researchView]);
 
   return (
     <main className="pv-page pv-stack">
