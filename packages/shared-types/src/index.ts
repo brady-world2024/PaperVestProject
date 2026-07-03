@@ -407,6 +407,22 @@ export type OrderTimeInForce = 'DAY' | 'GTC' | 'IOC';
 
 export type OrderSource = 'USER' | 'CONDITIONAL_ORDER' | 'SYSTEM';
 
+export type OrderExecutionStatus = 'PENDING' | 'PUBLISHED' | 'CONSUMED' | 'CANCELLED' | 'FAILED';
+
+export type OrderExecutionSummary = {
+  id: string;
+  status: OrderExecutionStatus;
+  triggerPrice: number;
+  executionPrice: number;
+  quoteTimestamp: string | null;
+  publishedAt: string | null;
+  consumedAt: string | null;
+  lastPublishError: string | null;
+  publishAttemptCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type CreateOrderPayload = {
   symbol: string;
   companyName?: string;
@@ -444,6 +460,7 @@ export type Order = {
   expiresAt: string | null;
   createdAt: string;
   updatedAt: string;
+  execution: OrderExecutionSummary | null;
 };
 
 export type OrderStatusEvent = {
