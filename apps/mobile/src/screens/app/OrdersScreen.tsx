@@ -24,6 +24,11 @@ import {
 import { queryKeys } from '../../services/api/queryKeys';
 import { appTheme } from '../../theme';
 import { formatCurrency, formatDateTime, formatShares } from '../../utils/formatters';
+import {
+  orderExecutionDetail,
+  orderExecutionLabel,
+  orderExecutionTone,
+} from '../../utils/orderExecution';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'Orders'>;
 
@@ -176,6 +181,14 @@ export function OrdersScreen({ route }: Props) {
                     <Text style={styles.detailValue}>
                       {order.estimatedGrossAmount == null ? '-' : formatCurrency(order.estimatedGrossAmount)}
                     </Text>
+                  </View>
+                </View>
+                <View style={styles.executionCard}>
+                  <View style={styles.executionRow}>
+                    <View style={[styles.executionPill, executionToneStyle(orderExecutionTone(order))]}>
+                      <Text style={styles.executionText}>{orderExecutionLabel(order)}</Text>
+                    </View>
+                    <Text style={styles.executionDetail}>{orderExecutionDetail(order)}</Text>
                   </View>
                 </View>
                 {order.status === 'PENDING' ? (
@@ -349,7 +362,50 @@ const styles = StyleSheet.create({
     fontSize: appTheme.typography.body,
     fontWeight: '700',
   },
+  executionCard: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#EEE8DC',
+    borderRadius: appTheme.radius.md,
+    borderWidth: 1,
+    marginTop: appTheme.spacing.sm,
+    paddingHorizontal: appTheme.spacing.md,
+    paddingVertical: appTheme.spacing.sm,
+  },
+  executionRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: appTheme.spacing.sm,
+  },
+  executionPill: {
+    borderRadius: appTheme.radius.pill,
+    paddingHorizontal: appTheme.spacing.sm,
+    paddingVertical: 6,
+  },
+  executionText: {
+    color: appTheme.colors.textPrimary,
+    fontSize: appTheme.typography.caption,
+    fontWeight: '800',
+  },
+  executionDetail: {
+    color: appTheme.colors.textSecondary,
+    flexShrink: 1,
+    fontSize: appTheme.typography.micro,
+  },
   cancelButton: {
     marginTop: appTheme.spacing.md,
   },
 });
+
+function executionToneStyle(tone: ReturnType<typeof orderExecutionTone>) {
+  switch (tone) {
+    case 'positive':
+      return { backgroundColor: appTheme.colors.positiveSoft };
+    case 'warning':
+      return { backgroundColor: '#FFF7D6' };
+    case 'danger':
+      return { backgroundColor: appTheme.colors.negativeSoft };
+    case 'neutral':
+      return { backgroundColor: '#F9F6EE' };
+  }
+}

@@ -35,6 +35,7 @@ public record OrderResponse(
 		Instant cancelledAt,
 		Instant expiresAt,
 		Instant createdAt,
-		Instant updatedAt
+		Instant updatedAt,
+		OrderExecutionSummaryResponse execution
 ) {
 }

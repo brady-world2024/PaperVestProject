@@ -23,6 +23,11 @@ import {
   conditionalOrderStatusTone,
 } from '@/lib/conditional-orders/presentation';
 import { queryKeys } from '@/lib/query-keys';
+import {
+  orderExecutionDetail,
+  orderExecutionLabel,
+  orderExecutionTone,
+} from '@/lib/orders/execution-presentation';
 import { getConditionalOrderAuditSummary } from '@/lib/trust-audit';
 import { webApi } from '@/lib/api';
 import { useWorkspaceDensity } from '@/lib/use-workspace-density';
@@ -373,11 +378,12 @@ export default function OrdersPage() {
                   message={webApi.getApiErrorMessage(cancelOmsOrderMutation.error, 'Unable to cancel OMS order')}
                 />
               ) : null}
-              <div className={`pv-workspace-table seven-column ${density}`}>
+              <div className={`pv-workspace-table eight-column ${density}`}>
                 <div className="pv-workspace-header">
                   <span>Order</span>
                   <span>Status</span>
                   <span>Type</span>
+                  <span>Execution</span>
                   <span>Filled</span>
                   <span>Gross</span>
                   <span>Submitted</span>
@@ -414,6 +420,10 @@ export default function OrdersPage() {
                     <div className="pv-workspace-cell">
                       <strong>{order.orderType}</strong>
                       <span className="pv-kicker">{order.timeInForce}</span>
+                    </div>
+                    <div className="pv-workspace-cell">
+                      <span className={`pv-chip ${orderExecutionTone(order)}`}>{orderExecutionLabel(order)}</span>
+                      <span className="pv-kicker">{orderExecutionDetail(order)}</span>
                     </div>
                     <div className="pv-workspace-cell numeric">
                       <strong>{formatShares(order.filledQuantity)}</strong>

@@ -18,6 +18,8 @@ public interface OrderExecutionRequestRepository extends JpaRepository<OrderExec
 
 	Optional<OrderExecutionRequest> findByOrderId(UUID orderId);
 
+	List<OrderExecutionRequest> findByOrderIdIn(List<UUID> orderIds);
+
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@Query("select request from OrderExecutionRequest request where request.id = :id")
 	Optional<OrderExecutionRequest> findByIdForUpdate(UUID id);
