@@ -190,4 +190,12 @@ public class OrderExecutionRequest {
 	public int getPublishAttemptCount() {
 		return publishAttemptCount;
 	}
+
+	public Instant getCreatedAt() {
+		return createdAt;
+	}
+
+	public Instant getUpdatedAt() {
+		return updatedAt;
+	}
 }

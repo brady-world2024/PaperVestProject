@@ -14,6 +14,8 @@ import com.papervest.orders.dto.CreateOrderRequest;
 import com.papervest.orders.dto.OrderDetailResponse;
 import com.papervest.orders.dto.OrderListResponse;
 import com.papervest.orders.dto.OrderResponse;
+import com.papervest.orders.execution.model.OrderExecutionRequest;
+import com.papervest.orders.execution.repository.OrderExecutionRequestRepository;
 import com.papervest.orders.model.Order;
 import com.papervest.orders.model.OrderSource;
 import com.papervest.orders.model.OrderStatus;
@@ -41,9 +43,12 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class OrderService {
@@ -54,6 +59,7 @@ public class OrderService {
 	private final UserAccountRepository userAccountRepository;
 	private final HoldingRepository holdingRepository;
 	private final TradeRepository tradeRepository;
+	private final OrderExecutionRequestRepository orderExecutionRequestRepository;
 	private final MarketDataService marketDataService;
 	private final LedgerService ledgerService;
 	private final PortfolioHistoryService portfolioHistoryService;
@@ -66,6 +72,7 @@ public class OrderService {
 			UserAccountRepository userAccountRepository,
 			HoldingRepository holdingRepository,
 			TradeRepository tradeRepository,
+			OrderExecutionRequestRepository orderExecutionRequestRepository,
 			MarketDataService marketDataService,
 			LedgerService ledgerService,
 			PortfolioHistoryService portfolioHistoryService,
@@ -77,6 +84,7 @@ public class OrderService {
 		this.userAccountRepository = userAccountRepository;
 		this.holdingRepository = holdingRepository;
 		this.tradeRepository = tradeRepository;
+		this.orderExecutionRequestRepository = orderExecutionRequestRepository;
 		this.marketDataService = marketDataService;
 		this.ledgerService = ledgerService;
 		this.portfolioHistoryService = portfolioHistoryService;
@@ -257,14 +265,26 @@ public class OrderService {
 
 	@Transactional(readOnly = true)
 	public OrderListResponse listOrders(UUID userId) {
-		return OrderMapper.toListResponse(orderRepository.findTop200ByUserIdOrderByCreatedAtDesc(userId));
+		List<Order> orders = orderRepository.findTop200ByUserIdOrderByCreatedAtDesc(userId);
+		Map<UUID, OrderExecutionRequest> executionRequestsByOrderId = executionRequestsByOrderId(orders);
+		return OrderMapper.toListResponse(orders, executionRequestsByOrderId);
 	}
 
 	@Transactional(readOnly = true)
 	public OrderDetailResponse getOrder(UUID userId, UUID orderId) {
 		Order order = orderRepository.findByIdAndUserId(orderId, userId)
 				.orElseThrow(() -> new ResourceNotFoundException("ORDER_NOT_FOUND", "Order could not be found"));
-		return OrderMapper.toDetailResponse(order, orderStatusEventRepository.findByOrderIdOrderByCreatedAtAsc(orderId));
+		OrderExecutionRequest executionRequest = orderExecutionRequestRepository.findByOrderId(orderId).orElse(null);
+		return OrderMapper.toDetailResponse(order, orderStatusEventRepository.findByOrderIdOrderByCreatedAtAsc(orderId), executionRequest);
+	}
+
+	private Map<UUID, OrderExecutionRequest> executionRequestsByOrderId(List<Order> orders) {
+		List<UUID> orderIds = orders.stream().map(Order::getId).toList();
+		if (orderIds.isEmpty()) {
+			return Map.of();
+		}
+		return orderExecutionRequestRepository.findByOrderIdIn(orderIds).stream()
+				.collect(Collectors.toMap(OrderExecutionRequest::getOrderId, Function.identity()));
 	}
 
 	private TradeExecutionResponse persistMarketOrder(
