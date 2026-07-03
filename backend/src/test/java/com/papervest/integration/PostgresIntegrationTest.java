@@ -184,8 +184,47 @@ class PostgresIntegrationTest extends AbstractContainerIntegrationTest {
 					""",
 				Integer.class
 		);
+		Integer orderExecutionRequestTables = jdbcTemplate.queryForObject(
+				"""
+					select count(*)
+					from information_schema.tables
+					where table_schema = 'public'
+					  and table_name = 'order_execution_requests'
+					""",
+				Integer.class
+		);
+		Integer orderExecutionRequestUniqueOrderIndexes = jdbcTemplate.queryForObject(
+				"""
+					select count(*)
+					from pg_indexes
+					where schemaname = 'public'
+					  and tablename = 'order_execution_requests'
+					  and indexname = 'ux_order_execution_requests_order_id'
+					""",
+				Integer.class
+		);
+		Integer orderExecutionRequestPendingDispatchIndexes = jdbcTemplate.queryForObject(
+				"""
+					select count(*)
+					from pg_indexes
+					where schemaname = 'public'
+					  and tablename = 'order_execution_requests'
+					  and indexname = 'ix_order_execution_requests_status_created_at'
+					""",
+				Integer.class
+		);
+		Integer orderExecutionRequestOrderStatusIndexes = jdbcTemplate.queryForObject(
+				"""
+					select count(*)
+					from pg_indexes
+					where schemaname = 'public'
+					  and tablename = 'order_execution_requests'
+					  and indexname = 'ix_order_execution_requests_order_status'
+					""",
+				Integer.class
+		);
 
-		assertThat(appliedMigrations).isEqualTo(8);
+		assertThat(appliedMigrations).isEqualTo(9);
 		assertThat(metadataColumnType).isEqualTo("jsonb");
 		assertThat(analyticsMetadataColumnType).isEqualTo("jsonb");
 		assertThat(orderMetadataColumnType).isEqualTo("jsonb");
@@ -200,6 +239,10 @@ class PostgresIntegrationTest extends AbstractContainerIntegrationTest {
 		assertThat(orderIdempotencyIndexes).isEqualTo(1);
 		assertThat(cashLedgerIndexes).isEqualTo(1);
 		assertThat(positionLedgerIndexes).isEqualTo(1);
+		assertThat(orderExecutionRequestTables).isEqualTo(1);
+		assertThat(orderExecutionRequestUniqueOrderIndexes).isEqualTo(1);
+		assertThat(orderExecutionRequestPendingDispatchIndexes).isEqualTo(1);
+		assertThat(orderExecutionRequestOrderStatusIndexes).isEqualTo(1);
 	}
 
 	@Test
