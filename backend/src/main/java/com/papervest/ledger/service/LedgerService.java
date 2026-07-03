@@ -114,6 +114,86 @@ public class LedgerService {
 				)));
 	}
 
+	public void recordCashReservation(
+			UUID userId,
+			UUID orderId,
+			BigDecimal amount,
+			UserAccount account,
+			String idempotencyKey
+	) {
+		recordCashEntry(
+				userId,
+				orderId,
+				null,
+				CashLedgerEntryType.RESERVATION,
+				amount,
+				account,
+				idempotencyKey,
+				"Pending buy cash reservation"
+		);
+	}
+
+	public void recordCashRelease(
+			UUID userId,
+			UUID orderId,
+			BigDecimal amount,
+			UserAccount account,
+			String idempotencyKey
+	) {
+		recordCashEntry(
+				userId,
+				orderId,
+				null,
+				CashLedgerEntryType.RELEASE,
+				amount.negate(),
+				account,
+				idempotencyKey,
+				"Cancelled buy cash release"
+		);
+	}
+
+	public void recordPositionReservation(
+			UUID userId,
+			String symbol,
+			UUID orderId,
+			BigDecimal quantity,
+			Holding holding,
+			String idempotencyKey
+	) {
+		recordPositionEntry(
+				userId,
+				symbol,
+				orderId,
+				null,
+				PositionLedgerEntryType.RESERVATION,
+				quantity.negate(),
+				holding,
+				idempotencyKey,
+				"Pending sell share reservation"
+		);
+	}
+
+	public void recordPositionRelease(
+			UUID userId,
+			String symbol,
+			UUID orderId,
+			BigDecimal quantity,
+			Holding holding,
+			String idempotencyKey
+	) {
+		recordPositionEntry(
+				userId,
+				symbol,
+				orderId,
+				null,
+				PositionLedgerEntryType.RELEASE,
+				quantity,
+				holding,
+				idempotencyKey,
+				"Cancelled sell share release"
+		);
+	}
+
 	private void recordCashEntry(
 			UUID userId,
 			UUID orderId,

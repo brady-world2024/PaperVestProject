@@ -2,6 +2,7 @@ import type {
   ChangePasswordPayload,
   ConfirmEmailVerificationPayload,
   CreateConditionalOrderPayload,
+  CreateOrderPayload,
   DeleteAccountPayload,
   LoginPayload,
   RequestPasswordResetPayload,
@@ -102,6 +103,14 @@ export function getOrders() {
 
 export function getOrder(orderId: string) {
   return papervestApiClient.getOrder(orderId);
+}
+
+export function createOrder(payload: CreateOrderPayload, idempotencyKey: string) {
+  return papervestApiClient.createOrder(payload, idempotencyKey);
+}
+
+export function cancelOrder(orderId: string) {
+  return papervestApiClient.cancelOrder(orderId);
 }
 
 export function createConditionalOrder(payload: CreateConditionalOrderPayload) {

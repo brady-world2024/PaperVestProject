@@ -182,6 +182,37 @@ public class Order {
 		return previousStatus;
 	}
 
+	public OrderStatus markPending(BigDecimal estimatedGrossAmount) {
+		OrderStatus previousStatus = status;
+		this.estimatedGrossAmount = MoneyUtils.scaleMoney(estimatedGrossAmount);
+		status = OrderStatus.PENDING;
+		return previousStatus;
+	}
+
+	public void reserveCash(BigDecimal amount) {
+		reservedCashAmount = MoneyUtils.scaleMoney(reservedCashAmount.add(amount));
+	}
+
+	public void reserveQuantity(BigDecimal quantity) {
+		reservedQuantity = MoneyUtils.scaleQuantity(reservedQuantity.add(quantity));
+	}
+
+	public void releaseReservedCash(BigDecimal amount) {
+		reservedCashAmount = MoneyUtils.scaleMoney(reservedCashAmount.subtract(amount));
+	}
+
+	public void releaseReservedQuantity(BigDecimal quantity) {
+		reservedQuantity = MoneyUtils.scaleQuantity(reservedQuantity.subtract(quantity));
+	}
+
+	public OrderStatus cancel() {
+		OrderStatus previousStatus = status;
+		status = OrderStatus.CANCELLED;
+		cancelledAt = Instant.now();
+		completedAt = cancelledAt;
+		return previousStatus;
+	}
+
 	public UUID getId() {
 		return id;
 	}

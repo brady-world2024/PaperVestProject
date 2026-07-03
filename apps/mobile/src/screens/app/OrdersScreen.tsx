@@ -2,6 +2,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { RefreshControl, StyleSheet, Text, View } from 'react-native';
 
+import { AppButton } from '../../components/common/AppButton';
 import { AppCard } from '../../components/common/AppCard';
 import { ConditionalOrderComposer } from '../../components/conditional-orders/ConditionalOrderComposer';
 import { ConditionalOrderList } from '../../components/conditional-orders/ConditionalOrderList';
@@ -14,6 +15,7 @@ import { MetricCard } from '../../components/portfolio/MetricCard';
 import { AppStackParamList } from '../../navigation/RootNavigator';
 import { getApiErrorMessage } from '../../services/api/client';
 import {
+  cancelOrder,
   cancelConditionalOrder,
   createConditionalOrder,
   getConditionalOrders,
@@ -46,6 +48,10 @@ export function OrdersScreen({ route }: Props) {
 
   const cancelMutation = useMutation({
     mutationFn: cancelConditionalOrder,
+  });
+
+  const cancelOmsOrderMutation = useMutation({
+    mutationFn: cancelOrder,
   });
 
   const orders = ordersQuery.data?.orders ?? [];
@@ -130,43 +136,69 @@ export function OrdersScreen({ route }: Props) {
             message={getApiErrorMessage(omsOrdersQuery.error, 'Unable to load order activity')}
           />
         ) : omsOrders.length ? (
-          omsOrders.map((order) => (
-            <AppCard key={order.id}>
-              <View style={styles.orderTop}>
-                <View style={styles.orderMain}>
-                  <View style={styles.symbolRow}>
-                    <Text style={styles.symbol}>{order.symbol}</Text>
-                    <View style={[styles.sidePill, order.side === 'BUY' ? styles.buyPill : styles.sellPill]}>
-                      <Text style={styles.sideText}>{order.side}</Text>
+          <>
+            {cancelOmsOrderMutation.isError ? (
+              <InlineNotice
+                tone="error"
+                message={getApiErrorMessage(cancelOmsOrderMutation.error, 'Unable to cancel OMS order')}
+              />
+            ) : null}
+            {omsOrders.map((order) => (
+              <AppCard key={order.id}>
+                <View style={styles.orderTop}>
+                  <View style={styles.orderMain}>
+                    <View style={styles.symbolRow}>
+                      <Text style={styles.symbol}>{order.symbol}</Text>
+                      <View style={[styles.sidePill, order.side === 'BUY' ? styles.buyPill : styles.sellPill]}>
+                        <Text style={styles.sideText}>{order.side}</Text>
+                      </View>
+                      <View style={styles.statusPill}>
+                        <Text style={styles.statusText}>{order.status}</Text>
+                      </View>
                     </View>
-                    <View style={styles.statusPill}>
-                      <Text style={styles.statusText}>{order.status}</Text>
-                    </View>
+                    <Text style={styles.company}>{order.companyName}</Text>
+                    <Text style={styles.metaLine}>
+                      {order.orderType} · {order.timeInForce} · Submitted {formatDateTime(order.submittedAt)}
+                    </Text>
                   </View>
-                  <Text style={styles.company}>{order.companyName}</Text>
-                  <Text style={styles.metaLine}>
-                    {order.orderType} · {order.timeInForce} · Submitted {formatDateTime(order.submittedAt)}
-                  </Text>
+                  <View style={styles.valueColumn}>
+                    <Text style={styles.value}>{formatShares(order.filledQuantity)}</Text>
+                    <Text style={styles.metaLine}>filled</Text>
+                  </View>
                 </View>
-                <View style={styles.valueColumn}>
-                  <Text style={styles.value}>{formatShares(order.filledQuantity)}</Text>
-                  <Text style={styles.metaLine}>filled</Text>
+                <View style={styles.detailGrid}>
+                  <View style={styles.detailCard}>
+                    <Text style={styles.detailLabel}>Requested</Text>
+                    <Text style={styles.detailValue}>{formatShares(order.requestedQuantity)}</Text>
+                  </View>
+                  <View style={styles.detailCard}>
+                    <Text style={styles.detailLabel}>Gross</Text>
+                    <Text style={styles.detailValue}>
+                      {order.estimatedGrossAmount == null ? '-' : formatCurrency(order.estimatedGrossAmount)}
+                    </Text>
+                  </View>
                 </View>
-              </View>
-              <View style={styles.detailGrid}>
-                <View style={styles.detailCard}>
-                  <Text style={styles.detailLabel}>Requested</Text>
-                  <Text style={styles.detailValue}>{formatShares(order.requestedQuantity)}</Text>
-                </View>
-                <View style={styles.detailCard}>
-                  <Text style={styles.detailLabel}>Gross</Text>
-                  <Text style={styles.detailValue}>
-                    {order.estimatedGrossAmount == null ? '-' : formatCurrency(order.estimatedGrossAmount)}
-                  </Text>
-                </View>
-              </View>
-            </AppCard>
-          ))
+                {order.status === 'PENDING' ? (
+                  <AppButton
+                    label="Cancel order"
+                    variant="ghost"
+                    loading={cancelOmsOrderMutation.isPending && cancelOmsOrderMutation.variables === order.id}
+                    style={styles.cancelButton}
+                    onPress={() => {
+                      void (async () => {
+                        await cancelOmsOrderMutation.mutateAsync(order.id);
+                        await Promise.all([
+                          queryClient.invalidateQueries({ queryKey: queryKeys.orders }),
+                          queryClient.invalidateQueries({ queryKey: queryKeys.portfolio }),
+                          queryClient.invalidateQueries({ queryKey: queryKeys.tradeHistory }),
+                        ]);
+                      })();
+                    }}
+                  />
+                ) : null}
+              </AppCard>
+            ))}
+          </>
         ) : (
           <EmptyState
             title="No OMS orders yet"
@@ -316,5 +348,8 @@ const styles = StyleSheet.create({
     color: appTheme.colors.textPrimary,
     fontSize: appTheme.typography.body,
     fontWeight: '700',
+  },
+  cancelButton: {
+    marginTop: appTheme.spacing.md,
   },
 });
