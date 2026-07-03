@@ -77,12 +77,8 @@ export default function PortfolioPage() {
           <p className="pv-copy inverse">Cash, market value, and P&amp;L are calculated in the backend.</p>
 
           <div className="pv-dashboard-summary-grid">
-            <MetricCard label="Cash balance" value={summary ? formatCurrency(summary.cashBalance) : '...'} />
-            <MetricCard
-              label="Daily move"
-              value={summary ? formatSignedCurrency(summary.dailyChange) : '...'}
-              tone={(summary?.dailyChange ?? 0) >= 0 ? 'positive' : 'negative'}
-            />
+            <MetricCard label="Buying power" value={summary ? formatCurrency(summary.availableCashBalance) : '...'} />
+            <MetricCard label="Reserved cash" value={summary ? formatCurrency(summary.reservedCashBalance) : '...'} />
             <MetricCard
               label="Unrealized P&L"
               value={summary ? formatSignedCurrency(summary.unrealizedPnl) : '...'}
@@ -104,6 +100,10 @@ export default function PortfolioPage() {
           <div className="pv-meta-row">
             <span className="pv-kicker">Initial cash</span>
             <strong>{summary ? formatCurrency(summary.initialCash) : '...'}</strong>
+          </div>
+          <div className="pv-meta-row">
+            <span className="pv-kicker">Cash balance</span>
+            <strong>{summary ? formatCurrency(summary.cashBalance) : '...'}</strong>
           </div>
           <div className="pv-meta-row">
             <span className="pv-kicker">Holdings market value</span>
@@ -219,7 +219,7 @@ export default function PortfolioPage() {
             <div className={`pv-workspace-table ${density}`}>
               <div className="pv-workspace-header">
                 <span>Holding</span>
-                <span>Quantity</span>
+                <span>Available</span>
                 <span>Last price</span>
                 <span>Market value</span>
                 <span>Unrealized</span>
@@ -248,8 +248,12 @@ export default function PortfolioPage() {
                       {density === 'comfortable' ? (
                         <>
                           <span className="pv-list-meta-line">
-                            <span>{formatShares(holding.quantity)} shares</span>
+                            <span>{formatShares(holding.quantity)} total shares</span>
                             <span>Avg {formatCurrency(holding.averageCost)}</span>
+                          </span>
+                          <span className="pv-list-meta-line">
+                            <span>{formatShares(holding.availableQuantity)} available</span>
+                            <span>{formatShares(holding.reservedQuantity)} reserved</span>
                           </span>
                           {holding.quoteTimestamp ? (
                             <span className="pv-list-meta-line">
@@ -264,7 +268,12 @@ export default function PortfolioPage() {
                       ) : null}
                     </div>
                     <div className="pv-workspace-cell numeric">
-                      <strong>{formatShares(holding.quantity)}</strong>
+                      <strong>{formatShares(holding.availableQuantity)}</strong>
+                      <span className="pv-kicker">
+                        {holding.reservedQuantity > 0
+                          ? `${formatShares(holding.reservedQuantity)} reserved`
+                          : `${formatShares(holding.quantity)} total`}
+                      </span>
                     </div>
                     <div className="pv-workspace-cell numeric">
                       <strong>{formatCurrency(holding.currentPrice)}</strong>

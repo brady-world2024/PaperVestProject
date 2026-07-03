@@ -23,6 +23,7 @@ import { getStaleQuoteBadge, getStaleQuoteMessage } from '@/lib/market-data-fres
 import { liveQuoteRefreshOptions, QUOTE_AUTO_REFRESH_INTERVAL_MS } from '@/lib/market-data-refresh';
 import { describeMarketSession, getMarketSessionChipClass } from '@/lib/market-session';
 import { queryKeys } from '@/lib/query-keys';
+import { getTradeAvailability } from '@/lib/trade-availability';
 import { useLiveNow } from '@/lib/use-live-now';
 import { webApi } from '@/lib/api';
 import {
@@ -138,14 +139,18 @@ export default function StockDetailPage() {
   const isWatchlisted = Boolean(watchlistItem);
   const currentPrice = quote?.currentPrice ?? 0;
   const portfolioSummary = portfolioQuery.data?.summary;
-  const cashBalance = portfolioSummary?.cashBalance ?? 0;
+  const tradeAvailability = getTradeAvailability(portfolioSummary, holding);
+  const cashBalance = tradeAvailability.cashBalance;
+  const availableCashBalance = tradeAvailability.availableCashBalance;
+  const reservedCashBalance = tradeAvailability.reservedCashBalance;
   const totalPortfolioValue = portfolioSummary?.totalPortfolioValue ?? 0;
-  const availableToSell = holding?.quantity ?? 0;
+  const availableToSell = tradeAvailability.availableQuantity;
+  const reservedQuantity = tradeAvailability.reservedQuantity;
   const holdingMarketValue = holding?.marketValue ?? 0;
   const currentPositionWeight =
     totalPortfolioValue > 0 ? (holdingMarketValue / totalPortfolioValue) * 100 : 0;
   const maxAffordableShares =
-    currentPrice > 0 ? Math.floor((cashBalance / currentPrice) * 10_000) / 10_000 : 0;
+    currentPrice > 0 ? Math.floor((availableCashBalance / currentPrice) * 10_000) / 10_000 : 0;
   const detailErrorMessage = detailQuery.isError
     ? webApi.getApiErrorMessage(detailQuery.error, 'Unable to load this stock right now')
     : null;
@@ -533,12 +538,20 @@ export default function StockDetailPage() {
             </div>
 
             <div className="pv-meta-row">
-              <span className="pv-kicker">Cash available</span>
-              <strong>{formatCurrency(cashBalance)}</strong>
+              <span className="pv-kicker">Buying power</span>
+              <strong>{formatCurrency(availableCashBalance)}</strong>
+            </div>
+            <div className="pv-meta-row">
+              <span className="pv-kicker">Reserved cash</span>
+              <strong>{formatCurrency(reservedCashBalance)}</strong>
             </div>
             <div className="pv-meta-row">
               <span className="pv-kicker">Shares available</span>
               <strong>{formatShares(availableToSell)}</strong>
+            </div>
+            <div className="pv-meta-row">
+              <span className="pv-kicker">Reserved shares</span>
+              <strong>{formatShares(reservedQuantity)}</strong>
             </div>
             <div className="pv-meta-row">
               <span className="pv-kicker">Current position weight</span>
@@ -568,13 +581,13 @@ export default function StockDetailPage() {
               subtitle="See how cash, size, and concentration shift before opening or adding exposure."
               submitLabel="Place buy order"
               currentPrice={currentPrice}
-              cashBalance={cashBalance}
+              cashBalance={availableCashBalance}
               totalPortfolioValue={totalPortfolioValue}
               holdingQuantity={holding?.quantity ?? 0}
               holdingAverageCost={holding?.averageCost ?? 0}
               holdingMarketValue={holdingMarketValue}
-              availableLabel="Available cash"
-              availableValue={formatCurrency(cashBalance)}
+              availableLabel="Buying power"
+              availableValue={formatCurrency(availableCashBalance)}
               supportLabel="Execution source"
               supportValue="Current backend quote"
               followThroughAction={{
@@ -595,8 +608,8 @@ export default function StockDetailPage() {
                   : null
               }
               getBlockingMessage={(quantity) =>
-                quantity * currentPrice > cashBalance
-                  ? 'This estimated order is larger than your available virtual cash.'
+                quantity * currentPrice > availableCashBalance
+                  ? 'This estimated order is larger than your available buying power.'
                   : null
               }
               onSubmitQuantity={async (quantity) => {
@@ -642,7 +655,7 @@ export default function StockDetailPage() {
               }
               getBlockingMessage={(quantity) =>
                 quantity > availableToSell
-                  ? 'You cannot sell more shares than the backend reports in your holdings.'
+                  ? 'You cannot sell more shares than your available unreserved position.'
                   : null
               }
               onSubmitQuantity={async (quantity) => {
