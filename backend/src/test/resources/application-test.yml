@@ -55,3 +55,21 @@ app:
       queue: conditional-orders.execute
       routing-key: conditional-orders.execute
       listener-enabled: false
+  orders:
+    execution:
+      scheduler:
+        enabled: false
+        batch-size: 25
+        fixed-delay-ms: 60000
+      dispatcher:
+        enabled: false
+        batch-size: 25
+        fixed-delay-ms: 60000
+      messaging:
+        exchange: orders.execution.exchange
+        queue: orders.execution.execute
+        routing-key: orders.execution.execute
+        dead-letter-exchange: orders.execution.dlx
+        dead-letter-queue: orders.execution.dlq
+        dead-letter-routing-key: orders.execution.dead
+        listener-enabled: false
