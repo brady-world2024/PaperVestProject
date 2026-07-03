@@ -1537,6 +1537,10 @@ input {
   --pv-workspace-columns: minmax(220px, 2.2fr) repeat(5, minmax(120px, 1fr)) minmax(180px, 1.3fr);
 }
 
+.pv-workspace-table.eight-column {
+  --pv-workspace-columns: minmax(220px, 2.2fr) repeat(6, minmax(112px, 1fr)) minmax(170px, 1.2fr);
+}
+
 .pv-workspace-header,
 .pv-workspace-row {
   display: grid;
