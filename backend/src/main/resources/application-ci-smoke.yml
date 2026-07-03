@@ -31,3 +31,11 @@ app:
       enabled: false
     messaging:
       listener-enabled: false
+  orders:
+    execution:
+      scheduler:
+        enabled: false
+      dispatcher:
+        enabled: false
+      messaging:
+        listener-enabled: false

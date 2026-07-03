@@ -126,3 +126,21 @@ app:
       queue: ${APP_CONDITIONAL_ORDERS_QUEUE:conditional-orders.execute}
       routing-key: ${APP_CONDITIONAL_ORDERS_ROUTING_KEY:conditional-orders.execute}
       listener-enabled: ${APP_CONDITIONAL_ORDERS_LISTENER_ENABLED:true}
+  orders:
+    execution:
+      scheduler:
+        enabled: ${APP_ORDER_EXECUTION_SCHEDULER_ENABLED:true}
+        batch-size: ${APP_ORDER_EXECUTION_BATCH_SIZE:100}
+        fixed-delay-ms: ${APP_ORDER_EXECUTION_FIXED_DELAY_MS:10000}
+      dispatcher:
+        enabled: ${APP_ORDER_EXECUTION_DISPATCHER_ENABLED:true}
+        batch-size: ${APP_ORDER_EXECUTION_DISPATCHER_BATCH_SIZE:100}
+        fixed-delay-ms: ${APP_ORDER_EXECUTION_DISPATCHER_FIXED_DELAY_MS:5000}
+      messaging:
+        exchange: ${APP_ORDER_EXECUTION_EXCHANGE:orders.execution.exchange}
+        queue: ${APP_ORDER_EXECUTION_QUEUE:orders.execution.execute}
+        routing-key: ${APP_ORDER_EXECUTION_ROUTING_KEY:orders.execution.execute}
+        dead-letter-exchange: ${APP_ORDER_EXECUTION_DLX:orders.execution.dlx}
+        dead-letter-queue: ${APP_ORDER_EXECUTION_DLQ:orders.execution.dlq}
+        dead-letter-routing-key: ${APP_ORDER_EXECUTION_DLK:orders.execution.dead}
+        listener-enabled: ${APP_ORDER_EXECUTION_LISTENER_ENABLED:true}
