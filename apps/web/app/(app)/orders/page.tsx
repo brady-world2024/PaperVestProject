@@ -149,6 +149,21 @@ export default function OrdersPage() {
     },
   });
 
+  const cancelOmsOrderMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      await csrfBootstrapRef.current;
+      return webApi.cancelOrder(orderId);
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.orders }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.portfolio }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.tradeHistory }),
+      ]);
+      await refreshCsrfBootstrap();
+    },
+  });
+
   const orders = ordersQuery.data?.orders ?? [];
   const omsOrders = omsOrdersQuery.data?.orders ?? [];
   const orderAuditSummary = getConditionalOrderAuditSummary(orders);
@@ -351,62 +366,84 @@ export default function OrdersPage() {
           ) : !omsOrders.length ? (
             <InlineNotice tone="info" message="No OMS orders yet." />
           ) : (
-            <div className={`pv-workspace-table seven-column ${density}`}>
-              <div className="pv-workspace-header">
-                <span>Order</span>
-                <span>Status</span>
-                <span>Type</span>
-                <span>Filled</span>
-                <span>Gross</span>
-                <span>Submitted</span>
-                <span>Completed</span>
-              </div>
-              {omsOrders.map((order) => (
-                <div className={`pv-workspace-row ${density}`} key={order.id}>
-                  <div className="pv-workspace-cell primary">
-                    <span className="pv-list-symbol-line">
-                      <span className="pv-list-symbol">{order.symbol}</span>
-                      <span className={`pv-chip ${order.side === 'BUY' ? 'buy' : 'sell'}`}>{order.side}</span>
-                      <span className="pv-chip neutral">{order.source}</span>
-                    </span>
-                    <span className="pv-list-company">
-                      {order.companyName} · {order.id}
-                    </span>
-                    {density === 'comfortable' ? (
-                      <span className="pv-list-meta-line">
-                        <span>Requested</span>
-                        <span>{formatShares(order.requestedQuantity)} shares</span>
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="pv-workspace-cell">
-                    <span
-                      className={`pv-chip ${
-                        order.status === 'FILLED' ? 'positive' : order.status === 'REJECTED' ? 'danger' : 'neutral'
-                      }`}
-                    >
-                      {order.status}
-                    </span>
-                  </div>
-                  <div className="pv-workspace-cell">
-                    <strong>{order.orderType}</strong>
-                    <span className="pv-kicker">{order.timeInForce}</span>
-                  </div>
-                  <div className="pv-workspace-cell numeric">
-                    <strong>{formatShares(order.filledQuantity)}</strong>
-                  </div>
-                  <div className="pv-workspace-cell numeric">
-                    <strong>{order.estimatedGrossAmount == null ? '-' : formatCurrency(order.estimatedGrossAmount)}</strong>
-                  </div>
-                  <div className="pv-workspace-cell">
-                    <span className="pv-kicker">{formatDateTime(order.submittedAt)}</span>
-                  </div>
-                  <div className="pv-workspace-cell">
-                    <span className="pv-kicker">{order.completedAt ? formatDateTime(order.completedAt) : 'Open'}</span>
-                  </div>
+            <>
+              {cancelOmsOrderMutation.isError ? (
+                <InlineNotice
+                  tone="error"
+                  message={webApi.getApiErrorMessage(cancelOmsOrderMutation.error, 'Unable to cancel OMS order')}
+                />
+              ) : null}
+              <div className={`pv-workspace-table seven-column ${density}`}>
+                <div className="pv-workspace-header">
+                  <span>Order</span>
+                  <span>Status</span>
+                  <span>Type</span>
+                  <span>Filled</span>
+                  <span>Gross</span>
+                  <span>Submitted</span>
+                  <span className="actions">Actions</span>
                 </div>
-              ))}
-            </div>
+                {omsOrders.map((order) => (
+                  <div className={`pv-workspace-row ${density}`} key={order.id}>
+                    <div className="pv-workspace-cell primary">
+                      <span className="pv-list-symbol-line">
+                        <span className="pv-list-symbol">{order.symbol}</span>
+                        <span className={`pv-chip ${order.side === 'BUY' ? 'buy' : 'sell'}`}>{order.side}</span>
+                        <span className="pv-chip neutral">{order.source}</span>
+                      </span>
+                      <span className="pv-list-company">
+                        {order.companyName} · {order.id}
+                      </span>
+                      {density === 'comfortable' ? (
+                        <span className="pv-list-meta-line">
+                          <span>Requested</span>
+                          <span>{formatShares(order.requestedQuantity)} shares</span>
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="pv-workspace-cell">
+                      <span
+                        className={`pv-chip ${
+                          order.status === 'FILLED' ? 'positive' : order.status === 'REJECTED' ? 'danger' : 'neutral'
+                        }`}
+                      >
+                        {order.status}
+                      </span>
+                      <span className="pv-kicker">{order.completedAt ? formatDateTime(order.completedAt) : 'Open'}</span>
+                    </div>
+                    <div className="pv-workspace-cell">
+                      <strong>{order.orderType}</strong>
+                      <span className="pv-kicker">{order.timeInForce}</span>
+                    </div>
+                    <div className="pv-workspace-cell numeric">
+                      <strong>{formatShares(order.filledQuantity)}</strong>
+                    </div>
+                    <div className="pv-workspace-cell numeric">
+                      <strong>{order.estimatedGrossAmount == null ? '-' : formatCurrency(order.estimatedGrossAmount)}</strong>
+                    </div>
+                    <div className="pv-workspace-cell">
+                      <span className="pv-kicker">{formatDateTime(order.submittedAt)}</span>
+                    </div>
+                    <div className="pv-workspace-cell actions">
+                      {order.status === 'PENDING' ? (
+                        <AppButton
+                          variant="ghost"
+                          loading={cancelOmsOrderMutation.isPending && cancelOmsOrderMutation.variables === order.id}
+                          disabled={!csrfReady}
+                          onClick={() => {
+                            void cancelOmsOrderMutation.mutateAsync(order.id);
+                          }}
+                        >
+                          Cancel
+                        </AppButton>
+                      ) : (
+                        <span className="pv-kicker">Locked</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </AppCard>
       </section>

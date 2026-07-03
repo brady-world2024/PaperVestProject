@@ -16,10 +16,12 @@ import type {
   ConditionalOrderListResponse,
   ConditionalOrderResponse,
   CreateConditionalOrderPayload,
+  CreateOrderPayload,
   DeleteAccountPayload,
   EmailVerificationResult,
   LoginPayload,
   NotificationListResponse,
+  Order,
   OrderDetailResponse,
   OrderListResponse,
   PortfolioHistoryRange,
@@ -345,6 +347,30 @@ export function createPapervestApiClient({
     },
     async getOrder(orderId: string) {
       const { data } = await apiClient.get<OrderDetailResponse>(`/orders/${orderId}`);
+      return data;
+    },
+    async createOrder(payload: CreateOrderPayload, idempotencyKey: string) {
+      const previousCookieToken = resolveCookieCsrfToken();
+      await ensureCookieCsrfToken();
+      const { data } = await apiClient.post<Order>(
+        '/orders',
+        payload,
+        buildCookieWriteConfig({
+          'X-Idempotency-Key': idempotencyKey,
+        })
+      );
+      await stabilizeCookieCsrfToken(previousCookieToken);
+      return data;
+    },
+    async cancelOrder(orderId: string) {
+      const previousCookieToken = resolveCookieCsrfToken();
+      await ensureCookieCsrfToken();
+      const { data } = await apiClient.post<Order>(
+        `/orders/${orderId}/cancel`,
+        {},
+        buildCookieWriteConfig()
+      );
+      await stabilizeCookieCsrfToken(previousCookieToken);
       return data;
     },
     async createConditionalOrder(payload: CreateConditionalOrderPayload) {

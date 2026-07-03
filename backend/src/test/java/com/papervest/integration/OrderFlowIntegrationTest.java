@@ -143,7 +143,285 @@ class OrderFlowIntegrationTest {
 		assertThat(positionLedgerQuantity).isEqualByComparingTo("5.0000");
 	}
 
+	@Test
+	void limitBuyOrderReservesCashAndCancelReleasesIt() throws Exception {
+		AuthContext auth = registerAndExtractAuthContext();
+
+		MvcResult orderResult = mockMvc.perform(post("/api/orders")
+						.header("Authorization", "Bearer " + auth.accessToken())
+						.header("X-Idempotency-Key", "limit-buy-reservation-1")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "symbol": "AAPL",
+								  "companyName": "Apple Inc.",
+								  "side": "BUY",
+								  "orderType": "LIMIT",
+								  "timeInForce": "DAY",
+								  "quantity": 3,
+								  "limitPrice": 99.50
+								}
+								"""))
+				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.status").value("PENDING"))
+				.andExpect(jsonPath("$.orderType").value("LIMIT"))
+				.andExpect(jsonPath("$.reservedCashAmount").value(298.50))
+				.andExpect(jsonPath("$.reservedQuantity").value(0.0000))
+				.andReturn();
+
+		JsonNode orderJson = objectMapper.readTree(orderResult.getResponse().getContentAsString());
+		UUID orderId = UUID.fromString(orderJson.path("id").asText());
+
+		mockMvc.perform(get("/api/orders/{orderId}", orderId)
+						.header("Authorization", "Bearer " + auth.accessToken()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.order.status").value("PENDING"))
+				.andExpect(jsonPath("$.events.length()").value(3))
+				.andExpect(jsonPath("$.events[0].toStatus").value("CREATED"))
+				.andExpect(jsonPath("$.events[1].toStatus").value("ACCEPTED"))
+				.andExpect(jsonPath("$.events[2].toStatus").value("PENDING"));
+
+		BigDecimal reservedCash = jdbcTemplate.queryForObject(
+				"select reserved_cash_balance from user_accounts where user_id = ?",
+				BigDecimal.class,
+				auth.userId()
+		);
+		BigDecimal cashBalance = jdbcTemplate.queryForObject(
+				"select cash_balance from user_accounts where user_id = ?",
+				BigDecimal.class,
+				auth.userId()
+		);
+		BigDecimal reservationAmount = jdbcTemplate.queryForObject(
+				"select amount from cash_ledger_entries where order_id = ? and entry_type = 'RESERVATION'",
+				BigDecimal.class,
+				orderId
+		);
+		Integer tradeCount = jdbcTemplate.queryForObject(
+				"select count(*) from trades where order_id = ?",
+				Integer.class,
+				orderId
+		);
+
+		assertThat(reservedCash).isEqualByComparingTo("298.50");
+		assertThat(cashBalance).isEqualByComparingTo("100000.00");
+		assertThat(reservationAmount).isEqualByComparingTo("298.50");
+		assertThat(tradeCount).isZero();
+
+		mockMvc.perform(post("/api/orders/{orderId}/cancel", orderId)
+						.header("Authorization", "Bearer " + auth.accessToken()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("CANCELLED"))
+				.andExpect(jsonPath("$.reservedCashAmount").value(0.00))
+				.andExpect(jsonPath("$.reservedQuantity").value(0.0000))
+				.andExpect(jsonPath("$.cancelledAt").isNotEmpty());
+
+		BigDecimal releasedCash = jdbcTemplate.queryForObject(
+				"select reserved_cash_balance from user_accounts where user_id = ?",
+				BigDecimal.class,
+				auth.userId()
+		);
+		BigDecimal releaseAmount = jdbcTemplate.queryForObject(
+				"select amount from cash_ledger_entries where order_id = ? and entry_type = 'RELEASE'",
+				BigDecimal.class,
+				orderId
+		);
+		Integer eventCount = jdbcTemplate.queryForObject(
+				"select count(*) from order_status_events where order_id = ?",
+				Integer.class,
+				orderId
+		);
+
+		assertThat(releasedCash).isEqualByComparingTo("0.00");
+		assertThat(releaseAmount).isEqualByComparingTo("-298.50");
+		assertThat(eventCount).isEqualTo(4);
+	}
+
+	@Test
+	void limitSellOrderReservesSharesAndCancelReleasesThem() throws Exception {
+		AuthContext auth = registerAndExtractAuthContext();
+		buyAapl(auth.accessToken(), "seed-sell-reservation-holding", 10);
+
+		MvcResult orderResult = mockMvc.perform(post("/api/orders")
+						.header("Authorization", "Bearer " + auth.accessToken())
+						.header("X-Idempotency-Key", "limit-sell-reservation-1")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "symbol": "AAPL",
+								  "companyName": "Apple Inc.",
+								  "side": "SELL",
+								  "orderType": "LIMIT",
+								  "timeInForce": "DAY",
+								  "quantity": 4,
+								  "limitPrice": 110.00
+								}
+								"""))
+				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.status").value("PENDING"))
+				.andExpect(jsonPath("$.reservedCashAmount").value(0.00))
+				.andExpect(jsonPath("$.reservedQuantity").value(4.0000))
+				.andReturn();
+
+		JsonNode orderJson = objectMapper.readTree(orderResult.getResponse().getContentAsString());
+		UUID orderId = UUID.fromString(orderJson.path("id").asText());
+
+		BigDecimal reservedQuantity = jdbcTemplate.queryForObject(
+				"select reserved_quantity from holdings where user_id = ? and symbol = 'AAPL'",
+				BigDecimal.class,
+				auth.userId()
+		);
+		BigDecimal reservationQuantityDelta = jdbcTemplate.queryForObject(
+				"select quantity_delta from position_ledger_entries where order_id = ? and entry_type = 'RESERVATION'",
+				BigDecimal.class,
+				orderId
+		);
+
+		assertThat(reservedQuantity).isEqualByComparingTo("4.0000");
+		assertThat(reservationQuantityDelta).isEqualByComparingTo("-4.0000");
+
+		mockMvc.perform(post("/api/orders/{orderId}/cancel", orderId)
+						.header("Authorization", "Bearer " + auth.accessToken()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.status").value("CANCELLED"))
+				.andExpect(jsonPath("$.reservedCashAmount").value(0.00))
+				.andExpect(jsonPath("$.reservedQuantity").value(0.0000));
+
+		BigDecimal releasedQuantity = jdbcTemplate.queryForObject(
+				"select reserved_quantity from holdings where user_id = ? and symbol = 'AAPL'",
+				BigDecimal.class,
+				auth.userId()
+		);
+		BigDecimal releaseQuantityDelta = jdbcTemplate.queryForObject(
+				"select quantity_delta from position_ledger_entries where order_id = ? and entry_type = 'RELEASE'",
+				BigDecimal.class,
+				orderId
+		);
+
+		assertThat(releasedQuantity).isEqualByComparingTo("0.0000");
+		assertThat(releaseQuantityDelta).isEqualByComparingTo("4.0000");
+	}
+
+	@Test
+	void sellOrderCannotReserveSharesAlreadyReservedByAnotherOpenOrder() throws Exception {
+		AuthContext auth = registerAndExtractAuthContext();
+		buyAapl(auth.accessToken(), "seed-double-reservation-holding", 5);
+
+		mockMvc.perform(post("/api/orders")
+						.header("Authorization", "Bearer " + auth.accessToken())
+						.header("X-Idempotency-Key", "limit-sell-reservation-2")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "symbol": "AAPL",
+								  "companyName": "Apple Inc.",
+								  "side": "SELL",
+								  "orderType": "LIMIT",
+								  "timeInForce": "DAY",
+								  "quantity": 5,
+								  "limitPrice": 110.00
+								}
+								"""))
+				.andExpect(status().isCreated());
+
+		mockMvc.perform(post("/api/orders")
+						.header("Authorization", "Bearer " + auth.accessToken())
+						.header("X-Idempotency-Key", "limit-sell-reservation-3")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "symbol": "AAPL",
+								  "companyName": "Apple Inc.",
+								  "side": "SELL",
+								  "orderType": "LIMIT",
+								  "timeInForce": "DAY",
+								  "quantity": 1,
+								  "limitPrice": 111.00
+								}
+								"""))
+				.andExpect(status().isUnprocessableEntity())
+				.andExpect(jsonPath("$.code").value("INSUFFICIENT_SHARES"));
+
+		BigDecimal reservedQuantity = jdbcTemplate.queryForObject(
+				"select reserved_quantity from holdings where user_id = ? and symbol = 'AAPL'",
+				BigDecimal.class,
+				auth.userId()
+		);
+
+		assertThat(reservedQuantity).isEqualByComparingTo("5.0000");
+	}
+
+	@Test
+	void idempotencyKeysCannotReplayAcrossMarketAndPendingOrderEndpoints() throws Exception {
+		AuthContext auth = registerAndExtractAuthContext();
+
+		mockMvc.perform(post("/api/orders")
+						.header("Authorization", "Bearer " + auth.accessToken())
+						.header("X-Idempotency-Key", "cross-endpoint-key-1")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "symbol": "AAPL",
+								  "companyName": "Apple Inc.",
+								  "side": "BUY",
+								  "orderType": "LIMIT",
+								  "timeInForce": "DAY",
+								  "quantity": 1,
+								  "limitPrice": 95.00
+								}
+								"""))
+				.andExpect(status().isCreated());
+
+		mockMvc.perform(post("/api/trades/buy")
+						.header("Authorization", "Bearer " + auth.accessToken())
+						.header("X-Idempotency-Key", "cross-endpoint-key-1")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "symbol": "AAPL",
+								  "companyName": "Apple Inc.",
+								  "quantity": 1
+								}
+								"""))
+				.andExpect(status().isUnprocessableEntity())
+				.andExpect(jsonPath("$.code").value("IDEMPOTENCY_KEY_CONFLICT"));
+
+		mockMvc.perform(post("/api/trades/buy")
+						.header("Authorization", "Bearer " + auth.accessToken())
+						.header("X-Idempotency-Key", "cross-endpoint-key-2")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "symbol": "AAPL",
+								  "companyName": "Apple Inc.",
+								  "quantity": 1
+								}
+								"""))
+				.andExpect(status().isOk());
+
+		mockMvc.perform(post("/api/orders")
+						.header("Authorization", "Bearer " + auth.accessToken())
+						.header("X-Idempotency-Key", "cross-endpoint-key-2")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "symbol": "AAPL",
+								  "companyName": "Apple Inc.",
+								  "side": "BUY",
+								  "orderType": "LIMIT",
+								  "timeInForce": "DAY",
+								  "quantity": 1,
+								  "limitPrice": 95.00
+								}
+								"""))
+				.andExpect(status().isUnprocessableEntity())
+				.andExpect(jsonPath("$.code").value("IDEMPOTENCY_KEY_CONFLICT"));
+	}
+
 	private String registerAndExtractAccessToken() throws Exception {
+		return registerAndExtractAuthContext().accessToken();
+	}
+
+	private AuthContext registerAndExtractAuthContext() throws Exception {
 		String email = "orders+" + UUID.randomUUID() + "@example.com";
 		MvcResult result = mockMvc.perform(post("/api/auth/register")
 						.contentType(MediaType.APPLICATION_JSON)
@@ -159,7 +437,23 @@ class OrderFlowIntegrationTest {
 				.andReturn();
 
 		JsonNode jsonNode = objectMapper.readTree(result.getResponse().getContentAsString());
-		return jsonNode.path("accessToken").asText();
+		UUID userId = jdbcTemplate.queryForObject("select id from users where email = ?", UUID.class, email);
+		return new AuthContext(jsonNode.path("accessToken").asText(), userId);
+	}
+
+	private void buyAapl(String accessToken, String idempotencyKey, int quantity) throws Exception {
+		mockMvc.perform(post("/api/trades/buy")
+						.header("Authorization", "Bearer " + accessToken)
+						.header("X-Idempotency-Key", idempotencyKey)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "symbol": "AAPL",
+								  "companyName": "Apple Inc.",
+								  "quantity": %d
+								}
+								""".formatted(quantity)))
+				.andExpect(status().isOk());
 	}
 
 	private StockQuote stockQuote(BigDecimal price) {
@@ -179,5 +473,8 @@ class OrderFlowIntegrationTest {
 				true,
 				"America/New_York"
 		);
+	}
+
+	private record AuthContext(String accessToken, UUID userId) {
 	}
 }

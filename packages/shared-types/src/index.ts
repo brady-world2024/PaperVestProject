@@ -407,6 +407,17 @@ export type OrderTimeInForce = 'DAY' | 'GTC' | 'IOC';
 
 export type OrderSource = 'USER' | 'CONDITIONAL_ORDER' | 'SYSTEM';
 
+export type CreateOrderPayload = {
+  symbol: string;
+  companyName?: string;
+  side: TradeSide;
+  orderType: OrderType;
+  timeInForce: OrderTimeInForce;
+  quantity: number;
+  limitPrice?: number | null;
+  stopPrice?: number | null;
+};
+
 export type Order = {
   id: string;
   symbol: string;
