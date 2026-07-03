@@ -6,5 +6,7 @@ export const queryKeys = {
   watchlist: ['watchlist'] as const,
   portfolio: ['portfolio'] as const,
   tradeHistory: ['trade-history'] as const,
+  orders: ['orders'] as const,
+  order: (orderId: string) => ['order', orderId] as const,
   conditionalOrders: ['conditional-orders'] as const,
 };

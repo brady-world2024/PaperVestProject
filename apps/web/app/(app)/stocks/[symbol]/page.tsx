@@ -85,6 +85,7 @@ export default function StockDetailPage() {
       queryClient.invalidateQueries({ queryKey: queryKeys.home }),
       queryClient.invalidateQueries({ queryKey: queryKeys.watchlist }),
       queryClient.invalidateQueries({ queryKey: queryKeys.tradeHistory }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.orders }),
       queryClient.invalidateQueries({ queryKey: queryKeys.stockDetail(symbol) }),
     ]);
   };
@@ -590,7 +591,7 @@ export default function StockDetailPage() {
               }
               successMessage={
                 buyMutation.isSuccess
-                  ? 'Buy order simulated successfully.'
+                  ? formatOrderSuccessMessage('Buy', buyMutation.data?.orderId, buyMutation.data?.orderStatus)
                   : null
               }
               getBlockingMessage={(quantity) =>
@@ -636,7 +637,7 @@ export default function StockDetailPage() {
               }
               successMessage={
                 sellMutation.isSuccess
-                  ? 'Sell order simulated successfully.'
+                  ? formatOrderSuccessMessage('Sell', sellMutation.data?.orderId, sellMutation.data?.orderStatus)
                   : null
               }
               getBlockingMessage={(quantity) =>
@@ -656,4 +657,11 @@ export default function StockDetailPage() {
 
 function isStockHistoryRange(value: string | null): value is StockHistoryRange {
   return value != null && validStockHistoryRanges.has(value as StockHistoryRange);
+}
+
+function formatOrderSuccessMessage(action: string, orderId?: string | null, orderStatus?: string | null) {
+  const status = orderStatus ? orderStatus.toLowerCase().replaceAll('_', ' ') : 'accepted';
+  return orderId
+    ? `${action} order ${status}. OMS id ${orderId.slice(0, 8)}.`
+    : `${action} order ${status}.`;
 }

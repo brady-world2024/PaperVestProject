@@ -18,4 +18,6 @@ public interface TradeRepository extends JpaRepository<Trade, UUID> {
 	Optional<Trade> findByUserIdAndIdempotencyKey(UUID userId, String idempotencyKey);
 
 	Optional<Trade> findByExecutionKey(String executionKey);
+
+	Optional<Trade> findTop1ByOrderId(UUID orderId);
 }

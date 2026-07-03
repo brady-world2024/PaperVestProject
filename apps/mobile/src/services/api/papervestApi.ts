@@ -96,6 +96,14 @@ export function getTradeHistory() {
   return papervestApiClient.getTradeHistory();
 }
 
+export function getOrders() {
+  return papervestApiClient.getOrders();
+}
+
+export function getOrder(orderId: string) {
+  return papervestApiClient.getOrder(orderId);
+}
+
 export function createConditionalOrder(payload: CreateConditionalOrderPayload) {
   return papervestApiClient.createConditionalOrder(payload);
 }

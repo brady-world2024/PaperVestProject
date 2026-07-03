@@ -103,6 +103,11 @@ export default function OrdersPage() {
     queryFn: webApi.getConditionalOrders,
   });
 
+  const omsOrdersQuery = useQuery({
+    queryKey: queryKeys.orders,
+    queryFn: webApi.getOrders,
+  });
+
   const createMutation = useMutation({
     mutationFn: async (values: ConditionalOrderFormValues) => {
       await csrfBootstrapRef.current;
@@ -145,6 +150,7 @@ export default function OrdersPage() {
   });
 
   const orders = ordersQuery.data?.orders ?? [];
+  const omsOrders = omsOrdersQuery.data?.orders ?? [];
   const orderAuditSummary = getConditionalOrderAuditSummary(orders);
   const visibleOrders = sortConditionalOrders(filterConditionalOrders(orders, orderFilter), orderSort);
   const activeCount = orders.filter((order) => order.status === 'ACTIVE').length;
@@ -158,6 +164,15 @@ export default function OrdersPage() {
       order.status === 'CANCELLED' ||
       order.status === 'EXPIRED'
   ).length;
+  const openOmsOrderCount = omsOrders.filter((order) =>
+    ['CREATED', 'ACCEPTED', 'PENDING', 'PARTIALLY_FILLED'].includes(order.status)
+  ).length;
+  const filledOmsOrderCount = omsOrders.filter((order) => order.status === 'FILLED').length;
+  const rejectedOmsOrderCount = omsOrders.filter((order) =>
+    ['CANCELLED', 'EXPIRED', 'REJECTED'].includes(order.status)
+  ).length;
+  const reservedCashTotal = omsOrders.reduce((sum, order) => sum + order.reservedCashAmount, 0);
+  const reservedShareTotal = omsOrders.reduce((sum, order) => sum + order.reservedQuantity, 0);
   const selectedSide = watch('side');
 
   return (
@@ -307,6 +322,92 @@ export default function OrdersPage() {
             <span className="pv-kicker">Latest failure code</span>
             <strong>{orderAuditSummary.latestFailureCode ?? 'No failure recorded'}</strong>
           </div>
+        </AppCard>
+      </section>
+
+      <section className="pv-stack">
+        <AppCard>
+          <SectionHeader
+            title="Order activity"
+            subtitle="Market fills and pending OMS state now share one backend order audit trail."
+          />
+          <div className="pv-dashboard-summary-grid">
+            <MetricCard label="Open" value={String(openOmsOrderCount)} />
+            <MetricCard label="Filled" value={String(filledOmsOrderCount)} />
+            <MetricCard label="Cancelled / rejected" value={String(rejectedOmsOrderCount)} />
+            <MetricCard label="Reserved cash" value={formatCurrency(reservedCashTotal)} />
+            <MetricCard label="Reserved shares" value={formatShares(reservedShareTotal)} />
+          </div>
+          {omsOrdersQuery.isLoading ? (
+            <div className="pv-subgrid">
+              <div className="pv-skeleton" />
+              <div className="pv-skeleton" />
+            </div>
+          ) : omsOrdersQuery.isError ? (
+            <InlineNotice
+              tone="error"
+              message={webApi.getApiErrorMessage(omsOrdersQuery.error, 'Unable to load order activity')}
+            />
+          ) : !omsOrders.length ? (
+            <InlineNotice tone="info" message="No OMS orders yet." />
+          ) : (
+            <div className={`pv-workspace-table seven-column ${density}`}>
+              <div className="pv-workspace-header">
+                <span>Order</span>
+                <span>Status</span>
+                <span>Type</span>
+                <span>Filled</span>
+                <span>Gross</span>
+                <span>Submitted</span>
+                <span>Completed</span>
+              </div>
+              {omsOrders.map((order) => (
+                <div className={`pv-workspace-row ${density}`} key={order.id}>
+                  <div className="pv-workspace-cell primary">
+                    <span className="pv-list-symbol-line">
+                      <span className="pv-list-symbol">{order.symbol}</span>
+                      <span className={`pv-chip ${order.side === 'BUY' ? 'buy' : 'sell'}`}>{order.side}</span>
+                      <span className="pv-chip neutral">{order.source}</span>
+                    </span>
+                    <span className="pv-list-company">
+                      {order.companyName} · {order.id}
+                    </span>
+                    {density === 'comfortable' ? (
+                      <span className="pv-list-meta-line">
+                        <span>Requested</span>
+                        <span>{formatShares(order.requestedQuantity)} shares</span>
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="pv-workspace-cell">
+                    <span
+                      className={`pv-chip ${
+                        order.status === 'FILLED' ? 'positive' : order.status === 'REJECTED' ? 'danger' : 'neutral'
+                      }`}
+                    >
+                      {order.status}
+                    </span>
+                  </div>
+                  <div className="pv-workspace-cell">
+                    <strong>{order.orderType}</strong>
+                    <span className="pv-kicker">{order.timeInForce}</span>
+                  </div>
+                  <div className="pv-workspace-cell numeric">
+                    <strong>{formatShares(order.filledQuantity)}</strong>
+                  </div>
+                  <div className="pv-workspace-cell numeric">
+                    <strong>{order.estimatedGrossAmount == null ? '-' : formatCurrency(order.estimatedGrossAmount)}</strong>
+                  </div>
+                  <div className="pv-workspace-cell">
+                    <span className="pv-kicker">{formatDateTime(order.submittedAt)}</span>
+                  </div>
+                  <div className="pv-workspace-cell">
+                    <span className="pv-kicker">{order.completedAt ? formatDateTime(order.completedAt) : 'Open'}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </AppCard>
       </section>
 

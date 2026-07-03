@@ -74,6 +74,7 @@ export function TradeTicketScreen({ navigation, route }: Props) {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.portfolio }),
         queryClient.invalidateQueries({ queryKey: queryKeys.tradeHistory }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.orders }),
         queryClient.invalidateQueries({ queryKey: queryKeys.watchlist }),
         queryClient.invalidateQueries({ queryKey: queryKeys.home }),
         queryClient.invalidateQueries({ queryKey: queryKeys.stockDetail(symbol) }),

@@ -35,6 +35,9 @@ public class Holding {
 	@Column(name = "average_cost", nullable = false, precision = 19, scale = 4)
 	private BigDecimal averageCost;
 
+	@Column(name = "reserved_quantity", nullable = false, precision = 19, scale = 4)
+	private BigDecimal reservedQuantity;
+
 	@Column(name = "created_at", nullable = false)
 	private Instant createdAt;
 
@@ -51,6 +54,7 @@ public class Holding {
 		this.companyName = companyName;
 		this.quantity = MoneyUtils.scaleQuantity(quantity);
 		this.averageCost = MoneyUtils.scalePrice(averageCost);
+		this.reservedQuantity = BigDecimal.ZERO.setScale(MoneyUtils.QUANTITY_SCALE);
 	}
 
 	@PrePersist
@@ -88,6 +92,14 @@ public class Holding {
 		return averageCost;
 	}
 
+	public BigDecimal getReservedQuantity() {
+		return reservedQuantity;
+	}
+
+	public BigDecimal getAvailableQuantity() {
+		return MoneyUtils.scaleQuantity(quantity.subtract(reservedQuantity));
+	}
+
 	public void applyBuy(BigDecimal purchasedQuantity, BigDecimal executedPrice, String resolvedCompanyName) {
 		BigDecimal totalCost = averageCost.multiply(quantity).add(executedPrice.multiply(purchasedQuantity));
 		BigDecimal newQuantity = MoneyUtils.scaleQuantity(quantity.add(purchasedQuantity));
@@ -99,6 +111,14 @@ public class Holding {
 
 	public void applySell(BigDecimal soldQuantity) {
 		quantity = MoneyUtils.scaleQuantity(quantity.subtract(soldQuantity));
+	}
+
+	public void reserveQuantity(BigDecimal quantityToReserve) {
+		reservedQuantity = MoneyUtils.scaleQuantity(reservedQuantity.add(quantityToReserve));
+	}
+
+	public void releaseReservedQuantity(BigDecimal quantityToRelease) {
+		reservedQuantity = MoneyUtils.scaleQuantity(reservedQuantity.subtract(quantityToRelease));
 	}
 
 	public boolean isClosed() {

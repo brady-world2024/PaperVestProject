@@ -54,6 +54,9 @@ public class Trade {
 	@Column(name = "execution_key", unique = true)
 	private String executionKey;
 
+	@Column(name = "order_id")
+	private UUID orderId;
+
 	@Column(name = "executed_at", nullable = false)
 	private Instant executedAt;
 
@@ -73,6 +76,36 @@ public class Trade {
 			String idempotencyKey,
 			String executionKey
 	) {
+		this(
+				userId,
+				symbol,
+				companyName,
+				side,
+				quantity,
+				executedPrice,
+				grossAmount,
+				realizedPnl,
+				cashBalanceAfterTrade,
+				idempotencyKey,
+				executionKey,
+				null
+		);
+	}
+
+	public Trade(
+			UUID userId,
+			String symbol,
+			String companyName,
+			TradeSide side,
+			BigDecimal quantity,
+			BigDecimal executedPrice,
+			BigDecimal grossAmount,
+			BigDecimal realizedPnl,
+			BigDecimal cashBalanceAfterTrade,
+			String idempotencyKey,
+			String executionKey,
+			UUID orderId
+	) {
 		this.id = UUID.randomUUID();
 		this.userId = userId;
 		this.symbol = symbol;
@@ -85,6 +118,7 @@ public class Trade {
 		this.cashBalanceAfterTrade = MoneyUtils.scaleMoney(cashBalanceAfterTrade);
 		this.idempotencyKey = idempotencyKey;
 		this.executionKey = executionKey;
+		this.orderId = orderId;
 	}
 
 	@PrePersist
@@ -141,5 +175,9 @@ public class Trade {
 
 	public String getExecutionKey() {
 		return executionKey;
+	}
+
+	public UUID getOrderId() {
+		return orderId;
 	}
 }

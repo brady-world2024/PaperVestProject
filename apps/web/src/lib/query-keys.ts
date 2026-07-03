@@ -13,6 +13,8 @@ export const queryKeys = {
   stockHistory: (symbol: string, range: string) => ['stock-history', symbol, range] as const,
   watchlist: ['watchlist'] as const,
   tradeHistory: ['trade-history'] as const,
+  orders: ['orders'] as const,
+  order: (orderId: string) => ['order', orderId] as const,
   conditionalOrders: ['conditional-orders'] as const,
   conditionalOrder: (orderId: string) => ['conditional-order', orderId] as const,
 };

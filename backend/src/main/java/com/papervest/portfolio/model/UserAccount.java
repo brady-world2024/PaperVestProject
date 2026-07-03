@@ -29,6 +29,9 @@ public class UserAccount {
 	@Column(name = "cash_balance", nullable = false, precision = 19, scale = 2)
 	private BigDecimal cashBalance;
 
+	@Column(name = "reserved_cash_balance", nullable = false, precision = 19, scale = 2)
+	private BigDecimal reservedCashBalance;
+
 	@Column(name = "realized_pnl", nullable = false, precision = 19, scale = 2)
 	private BigDecimal realizedPnl;
 
@@ -49,6 +52,7 @@ public class UserAccount {
 		this.userId = userId;
 		this.initialCash = MoneyUtils.scaleMoney(initialCash);
 		this.cashBalance = MoneyUtils.scaleMoney(initialCash);
+		this.reservedCashBalance = BigDecimal.ZERO.setScale(MoneyUtils.MONEY_SCALE);
 		this.realizedPnl = BigDecimal.ZERO.setScale(MoneyUtils.MONEY_SCALE);
 	}
 
@@ -79,6 +83,14 @@ public class UserAccount {
 		return cashBalance;
 	}
 
+	public BigDecimal getReservedCashBalance() {
+		return reservedCashBalance;
+	}
+
+	public BigDecimal getAvailableCashBalance() {
+		return MoneyUtils.scaleMoney(cashBalance.subtract(reservedCashBalance));
+	}
+
 	public BigDecimal getRealizedPnl() {
 		return realizedPnl;
 	}
@@ -89,6 +101,14 @@ public class UserAccount {
 
 	public void credit(BigDecimal amount) {
 		cashBalance = MoneyUtils.scaleMoney(cashBalance.add(amount));
+	}
+
+	public void reserveCash(BigDecimal amount) {
+		reservedCashBalance = MoneyUtils.scaleMoney(reservedCashBalance.add(amount));
+	}
+
+	public void releaseReservedCash(BigDecimal amount) {
+		reservedCashBalance = MoneyUtils.scaleMoney(reservedCashBalance.subtract(amount));
 	}
 
 	public void addRealizedPnl(BigDecimal amount) {
