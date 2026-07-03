@@ -383,10 +383,75 @@ export type TradeExecutionResponse = {
   cashBalanceAfterTrade: number;
   executedAt: string;
   idempotentReplay: boolean;
+  orderId?: string | null;
+  orderStatus?: OrderStatus | null;
 };
 
 export type TradeHistoryResponse = {
   trades: TradeExecutionResponse[];
+};
+
+export type OrderStatus =
+  | 'CREATED'
+  | 'ACCEPTED'
+  | 'PENDING'
+  | 'PARTIALLY_FILLED'
+  | 'FILLED'
+  | 'CANCELLED'
+  | 'EXPIRED'
+  | 'REJECTED';
+
+export type OrderType = 'MARKET' | 'LIMIT' | 'STOP' | 'STOP_LIMIT';
+
+export type OrderTimeInForce = 'DAY' | 'GTC' | 'IOC';
+
+export type OrderSource = 'USER' | 'CONDITIONAL_ORDER' | 'SYSTEM';
+
+export type Order = {
+  id: string;
+  symbol: string;
+  companyName: string;
+  side: TradeSide;
+  orderType: OrderType;
+  timeInForce: OrderTimeInForce;
+  status: OrderStatus;
+  source: OrderSource;
+  sourceRefId: string | null;
+  requestedQuantity: number;
+  filledQuantity: number;
+  limitPrice: number | null;
+  stopPrice: number | null;
+  estimatedGrossAmount: number | null;
+  reservedCashAmount: number;
+  reservedQuantity: number;
+  rejectionCode: string | null;
+  rejectionMessage: string | null;
+  submittedAt: string;
+  acceptedAt: string | null;
+  completedAt: string | null;
+  cancelledAt: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type OrderStatusEvent = {
+  id: string;
+  fromStatus: OrderStatus | null;
+  toStatus: OrderStatus;
+  reasonCode: string | null;
+  reasonMessage: string | null;
+  metadataJson: string | null;
+  createdAt: string;
+};
+
+export type OrderListResponse = {
+  orders: Order[];
+};
+
+export type OrderDetailResponse = {
+  order: Order;
+  events: OrderStatusEvent[];
 };
 
 export type ConditionalOrderStatus =

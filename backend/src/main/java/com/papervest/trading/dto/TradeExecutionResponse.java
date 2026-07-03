@@ -17,6 +17,8 @@ public record TradeExecutionResponse(
 		BigDecimal realizedPnl,
 		BigDecimal cashBalanceAfterTrade,
 		Instant executedAt,
-		boolean idempotentReplay
+		boolean idempotentReplay,
+		UUID orderId,
+		String orderStatus
 ) {
 }

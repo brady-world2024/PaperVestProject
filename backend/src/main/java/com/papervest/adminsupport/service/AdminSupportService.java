@@ -216,7 +216,9 @@ public class AdminSupportService {
 				trade.getRealizedPnl(),
 				trade.getCashBalanceAfterTrade(),
 				trade.getExecutedAt(),
-				false
+				false,
+				trade.getOrderId(),
+				trade.getOrderId() == null ? null : "FILLED"
 		);
 	}
 

@@ -20,6 +20,8 @@ import type {
   EmailVerificationResult,
   LoginPayload,
   NotificationListResponse,
+  OrderDetailResponse,
+  OrderListResponse,
   PortfolioHistoryRange,
   PortfolioHistoryResponse,
   PortfolioResponse,
@@ -335,6 +337,14 @@ export function createPapervestApiClient({
     },
     async getTradeHistory() {
       const { data } = await apiClient.get<TradeHistoryResponse>('/trades/history');
+      return data;
+    },
+    async getOrders() {
+      const { data } = await apiClient.get<OrderListResponse>('/orders');
+      return data;
+    },
+    async getOrder(orderId: string) {
+      const { data } = await apiClient.get<OrderDetailResponse>(`/orders/${orderId}`);
       return data;
     },
     async createConditionalOrder(payload: CreateConditionalOrderPayload) {

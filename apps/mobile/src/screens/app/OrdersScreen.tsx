@@ -1,9 +1,11 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { RefreshControl, StyleSheet, View } from 'react-native';
+import { RefreshControl, StyleSheet, Text, View } from 'react-native';
 
+import { AppCard } from '../../components/common/AppCard';
 import { ConditionalOrderComposer } from '../../components/conditional-orders/ConditionalOrderComposer';
 import { ConditionalOrderList } from '../../components/conditional-orders/ConditionalOrderList';
+import { EmptyState } from '../../components/feedback/EmptyState';
 import { InlineNotice } from '../../components/feedback/InlineNotice';
 import { SkeletonBlock } from '../../components/feedback/SkeletonBlock';
 import { ScreenContainer } from '../../components/layout/ScreenContainer';
@@ -15,9 +17,11 @@ import {
   cancelConditionalOrder,
   createConditionalOrder,
   getConditionalOrders,
+  getOrders,
 } from '../../services/api/papervestApi';
 import { queryKeys } from '../../services/api/queryKeys';
 import { appTheme } from '../../theme';
+import { formatCurrency, formatDateTime, formatShares } from '../../utils/formatters';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'Orders'>;
 
@@ -31,6 +35,11 @@ export function OrdersScreen({ route }: Props) {
     queryFn: getConditionalOrders,
   });
 
+  const omsOrdersQuery = useQuery({
+    queryKey: queryKeys.orders,
+    queryFn: getOrders,
+  });
+
   const createMutation = useMutation({
     mutationFn: createConditionalOrder,
   });
@@ -40,6 +49,7 @@ export function OrdersScreen({ route }: Props) {
   });
 
   const orders = ordersQuery.data?.orders ?? [];
+  const omsOrders = omsOrdersQuery.data?.orders ?? [];
   const activeCount = orders.filter((order) => order.status === 'ACTIVE').length;
   const pendingCount = orders.filter(
     (order) => order.status === 'TRIGGERED' || order.status === 'EXECUTING'
@@ -51,9 +61,13 @@ export function OrdersScreen({ route }: Props) {
       order.status === 'CANCELLED' ||
       order.status === 'EXPIRED'
   ).length;
+  const openOmsOrderCount = omsOrders.filter((order) =>
+    ['CREATED', 'ACCEPTED', 'PENDING', 'PARTIALLY_FILLED'].includes(order.status)
+  ).length;
+  const filledOmsOrderCount = omsOrders.filter((order) => order.status === 'FILLED').length;
 
   const onRefresh = async () => {
-    await ordersQuery.refetch();
+    await Promise.all([ordersQuery.refetch(), omsOrdersQuery.refetch()]);
   };
 
   return (
@@ -94,6 +108,71 @@ export function OrdersScreen({ route }: Props) {
         <MetricCard label="Triggered / executing" value={String(pendingCount)} />
         <MetricCard label="Terminal" value={String(terminalCount)} />
         <MetricCard label="Total" value={String(orders.length)} />
+      </View>
+
+      <View style={styles.section}>
+        <SectionHeader
+          title="Order activity"
+          subtitle="Market fills and open OMS orders from the backend order trail."
+        />
+        <View style={styles.metricWrap}>
+          <MetricCard label="Open OMS" value={String(openOmsOrderCount)} />
+          <MetricCard label="Filled OMS" value={String(filledOmsOrderCount)} />
+        </View>
+        {omsOrdersQuery.isLoading ? (
+          <>
+            <SkeletonBlock height={132} />
+            <SkeletonBlock height={132} />
+          </>
+        ) : omsOrdersQuery.isError ? (
+          <InlineNotice
+            tone="error"
+            message={getApiErrorMessage(omsOrdersQuery.error, 'Unable to load order activity')}
+          />
+        ) : omsOrders.length ? (
+          omsOrders.map((order) => (
+            <AppCard key={order.id}>
+              <View style={styles.orderTop}>
+                <View style={styles.orderMain}>
+                  <View style={styles.symbolRow}>
+                    <Text style={styles.symbol}>{order.symbol}</Text>
+                    <View style={[styles.sidePill, order.side === 'BUY' ? styles.buyPill : styles.sellPill]}>
+                      <Text style={styles.sideText}>{order.side}</Text>
+                    </View>
+                    <View style={styles.statusPill}>
+                      <Text style={styles.statusText}>{order.status}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.company}>{order.companyName}</Text>
+                  <Text style={styles.metaLine}>
+                    {order.orderType} · {order.timeInForce} · Submitted {formatDateTime(order.submittedAt)}
+                  </Text>
+                </View>
+                <View style={styles.valueColumn}>
+                  <Text style={styles.value}>{formatShares(order.filledQuantity)}</Text>
+                  <Text style={styles.metaLine}>filled</Text>
+                </View>
+              </View>
+              <View style={styles.detailGrid}>
+                <View style={styles.detailCard}>
+                  <Text style={styles.detailLabel}>Requested</Text>
+                  <Text style={styles.detailValue}>{formatShares(order.requestedQuantity)}</Text>
+                </View>
+                <View style={styles.detailCard}>
+                  <Text style={styles.detailLabel}>Gross</Text>
+                  <Text style={styles.detailValue}>
+                    {order.estimatedGrossAmount == null ? '-' : formatCurrency(order.estimatedGrossAmount)}
+                  </Text>
+                </View>
+              </View>
+            </AppCard>
+          ))
+        ) : (
+          <EmptyState
+            title="No OMS orders yet"
+            description="Filled and open backend orders will appear here after the first paper trade."
+          />
+        )}
       </View>
 
       <View style={styles.section}>
@@ -148,5 +227,94 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: appTheme.spacing.sm,
+  },
+  orderTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: appTheme.spacing.md,
+    marginBottom: appTheme.spacing.md,
+  },
+  orderMain: {
+    flex: 1,
+    gap: 4,
+  },
+  symbolRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: appTheme.spacing.sm,
+  },
+  symbol: {
+    color: appTheme.colors.textPrimary,
+    fontSize: appTheme.typography.heading,
+    fontWeight: '800',
+  },
+  company: {
+    color: appTheme.colors.textSecondary,
+    fontSize: appTheme.typography.caption,
+  },
+  metaLine: {
+    color: appTheme.colors.textSecondary,
+    fontSize: appTheme.typography.micro,
+  },
+  sidePill: {
+    borderRadius: appTheme.radius.pill,
+    paddingHorizontal: appTheme.spacing.sm,
+    paddingVertical: 6,
+  },
+  buyPill: {
+    backgroundColor: appTheme.colors.positiveSoft,
+  },
+  sellPill: {
+    backgroundColor: appTheme.colors.negativeSoft,
+  },
+  sideText: {
+    color: appTheme.colors.textPrimary,
+    fontSize: appTheme.typography.caption,
+    fontWeight: '800',
+  },
+  statusPill: {
+    borderRadius: appTheme.radius.pill,
+    paddingHorizontal: appTheme.spacing.sm,
+    paddingVertical: 6,
+    backgroundColor: '#F9F6EE',
+  },
+  statusText: {
+    color: appTheme.colors.textPrimary,
+    fontSize: appTheme.typography.caption,
+    fontWeight: '800',
+  },
+  valueColumn: {
+    alignItems: 'flex-end',
+    gap: 4,
+    flexShrink: 1,
+  },
+  value: {
+    color: appTheme.colors.textPrimary,
+    fontSize: appTheme.typography.heading,
+    fontWeight: '700',
+    textAlign: 'right',
+  },
+  detailGrid: {
+    flexDirection: 'row',
+    gap: appTheme.spacing.sm,
+    marginTop: appTheme.spacing.md,
+  },
+  detailCard: {
+    flex: 1,
+    backgroundColor: '#F9F6EE',
+    borderRadius: appTheme.radius.md,
+    paddingHorizontal: appTheme.spacing.md,
+    paddingVertical: appTheme.spacing.sm,
+    gap: 4,
+  },
+  detailLabel: {
+    color: appTheme.colors.textSecondary,
+    fontSize: appTheme.typography.micro,
+  },
+  detailValue: {
+    color: appTheme.colors.textPrimary,
+    fontSize: appTheme.typography.body,
+    fontWeight: '700',
   },
 });

@@ -141,13 +141,54 @@ class PostgresIntegrationTest extends AbstractContainerIntegrationTest {
 					where schemaname = 'public'
 					  and tablename = 'product_analytics_events'
 					  and indexname = 'ix_product_analytics_events_event_name_created_at'
+				""",
+				Integer.class
+		);
+		String orderMetadataColumnType = jdbcTemplate.queryForObject(
+				"""
+					select udt_name
+					from information_schema.columns
+					where table_schema = 'public'
+					  and table_name = 'order_status_events'
+					  and column_name = 'metadata_json'
+					""",
+				String.class
+		);
+		Integer orderIdempotencyIndexes = jdbcTemplate.queryForObject(
+				"""
+					select count(*)
+					from pg_indexes
+					where schemaname = 'public'
+					  and tablename = 'orders'
+					  and indexname = 'ux_orders_user_idempotency_key'
+					""",
+				Integer.class
+		);
+		Integer cashLedgerIndexes = jdbcTemplate.queryForObject(
+				"""
+					select count(*)
+					from pg_indexes
+					where schemaname = 'public'
+					  and tablename = 'cash_ledger_entries'
+					  and indexname = 'ix_cash_ledger_order_created_at'
+					""",
+				Integer.class
+		);
+		Integer positionLedgerIndexes = jdbcTemplate.queryForObject(
+				"""
+					select count(*)
+					from pg_indexes
+					where schemaname = 'public'
+					  and tablename = 'position_ledger_entries'
+					  and indexname = 'ix_position_ledger_order_created_at'
 					""",
 				Integer.class
 		);
 
-		assertThat(appliedMigrations).isEqualTo(7);
+		assertThat(appliedMigrations).isEqualTo(8);
 		assertThat(metadataColumnType).isEqualTo("jsonb");
 		assertThat(analyticsMetadataColumnType).isEqualTo("jsonb");
+		assertThat(orderMetadataColumnType).isEqualTo("jsonb");
 		assertThat(executionKeyIndexes).isEqualTo(1);
 		assertThat(schedulerIndexes).isEqualTo(1);
 		assertThat(emailTokenIndexes).isEqualTo(1);
@@ -156,6 +197,9 @@ class PostgresIntegrationTest extends AbstractContainerIntegrationTest {
 		assertThat(userNotificationIndexes).isEqualTo(1);
 		assertThat(productAnalyticsUserIndexes).isEqualTo(1);
 		assertThat(productAnalyticsEventIndexes).isEqualTo(1);
+		assertThat(orderIdempotencyIndexes).isEqualTo(1);
+		assertThat(cashLedgerIndexes).isEqualTo(1);
+		assertThat(positionLedgerIndexes).isEqualTo(1);
 	}
 
 	@Test

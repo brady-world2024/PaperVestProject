@@ -9,6 +9,7 @@ import com.papervest.common.util.MoneyUtils;
 import com.papervest.common.util.SymbolUtils;
 import com.papervest.marketdata.model.StockQuote;
 import com.papervest.marketdata.service.MarketDataService;
+import com.papervest.orders.service.OrderService;
 import com.papervest.portfolio.service.PortfolioHistoryService;
 import com.papervest.portfolio.model.UserAccount;
 import com.papervest.portfolio.repository.UserAccountRepository;
@@ -22,6 +23,7 @@ import com.papervest.trading.repository.HoldingRepository;
 import com.papervest.trading.repository.TradeRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,6 +46,7 @@ public class TradeService {
 	private final PortfolioHistoryService portfolioHistoryService;
 	private final ProductAnalyticsService productAnalyticsService;
 	private final TransactionTemplate transactionTemplate;
+	private final OrderService orderService;
 
 	public TradeService(
 			UserAccountRepository userAccountRepository,
@@ -54,6 +57,29 @@ public class TradeService {
 			ProductAnalyticsService productAnalyticsService,
 			PlatformTransactionManager transactionManager
 	) {
+		this(
+				userAccountRepository,
+				holdingRepository,
+				tradeRepository,
+				marketDataService,
+				portfolioHistoryService,
+				productAnalyticsService,
+				transactionManager,
+				null
+		);
+	}
+
+	@Autowired
+	public TradeService(
+			UserAccountRepository userAccountRepository,
+			HoldingRepository holdingRepository,
+			TradeRepository tradeRepository,
+			MarketDataService marketDataService,
+			PortfolioHistoryService portfolioHistoryService,
+			ProductAnalyticsService productAnalyticsService,
+			PlatformTransactionManager transactionManager,
+			OrderService orderService
+	) {
 		this.userAccountRepository = userAccountRepository;
 		this.holdingRepository = holdingRepository;
 		this.tradeRepository = tradeRepository;
@@ -61,13 +87,20 @@ public class TradeService {
 		this.portfolioHistoryService = portfolioHistoryService;
 		this.productAnalyticsService = productAnalyticsService;
 		this.transactionTemplate = new TransactionTemplate(transactionManager);
+		this.orderService = orderService;
 	}
 
 	public TradeExecutionResponse buy(UUID userId, TradeOrderRequest request, String idempotencyKey) {
+		if (orderService != null) {
+			return orderService.submitLegacyMarketOrder(userId, request, TradeSide.BUY, idempotencyKey);
+		}
 		return executeTrade(userId, request, TradeSide.BUY, idempotencyKey, null, null);
 	}
 
 	public TradeExecutionResponse sell(UUID userId, TradeOrderRequest request, String idempotencyKey) {
+		if (orderService != null) {
+			return orderService.submitLegacyMarketOrder(userId, request, TradeSide.SELL, idempotencyKey);
+		}
 		return executeTrade(userId, request, TradeSide.SELL, idempotencyKey, null, null);
 	}
 
@@ -359,7 +392,9 @@ public class TradeService {
 				trade.getRealizedPnl(),
 				trade.getCashBalanceAfterTrade(),
 				trade.getExecutedAt(),
-				idempotentReplay
+				idempotentReplay,
+				trade.getOrderId(),
+				trade.getOrderId() == null ? null : "FILLED"
 		);
 	}
 
