@@ -1,7 +1,10 @@
 package com.papervest.orders.repository;
 
 import com.papervest.orders.model.Order;
+import com.papervest.orders.model.OrderStatus;
+import com.papervest.orders.model.OrderType;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -21,4 +24,11 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@Query("select o from Order o where o.id = :id and o.userId = :userId")
 	Optional<Order> findByIdAndUserIdForUpdate(UUID id, UUID userId);
+
+	@Query("select o from Order o where o.status = :status and o.orderType in :orderTypes order by o.createdAt asc")
+	List<Order> findPendingExecutionCandidates(OrderStatus status, List<OrderType> orderTypes, Pageable pageable);
+
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@Query("select o from Order o where o.id = :id")
+	Optional<Order> findByIdForUpdate(UUID id);
 }
