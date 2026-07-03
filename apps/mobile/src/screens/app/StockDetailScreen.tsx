@@ -26,6 +26,7 @@ import { queryKeys } from '../../services/api/queryKeys';
 import { appTheme } from '../../theme';
 import { formatCurrency, formatMarketTimestamp, formatPercent, formatShares, formatSignedCurrency } from '../../utils/formatters';
 import { describeMarketSession } from '../../utils/marketSession';
+import { getTradeAvailability } from '../../utils/tradeAvailability';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'StockDetail'>;
 
@@ -73,6 +74,7 @@ export function StockDetailScreen({ navigation, route }: Props) {
   const quote = detailQuery.data;
   const watchlistItem = watchlistQuery.data?.items.find((item) => item.symbol === symbol);
   const holding = portfolioQuery.data?.holdings.find((item) => item.symbol === symbol);
+  const tradeAvailability = getTradeAvailability(portfolioQuery.data?.summary, holding);
   const isWatchlisted = Boolean(watchlistItem);
   const positive = (quote?.dailyChange ?? 0) >= 0;
   const marketSession = quote ? describeMarketSession(quote.marketSession) : null;
@@ -192,9 +194,21 @@ export function StockDetailScreen({ navigation, route }: Props) {
                   <Text style={styles.terminalValue}>{holding ? formatShares(holding.quantity) : '0'}</Text>
                 </View>
                 <View style={styles.terminalCell}>
-                  <Text style={styles.terminalLabel}>Available cash</Text>
+                  <Text style={styles.terminalLabel}>Buying power</Text>
                   <Text style={styles.terminalValue}>
-                    {portfolioQuery.data?.summary ? formatCurrency(portfolioQuery.data.summary.cashBalance) : '$0.00'}
+                    {formatCurrency(tradeAvailability.availableCashBalance)}
+                  </Text>
+                </View>
+                <View style={styles.terminalCell}>
+                  <Text style={styles.terminalLabel}>Shares available</Text>
+                  <Text style={styles.terminalValue}>
+                    {formatShares(tradeAvailability.availableQuantity)}
+                  </Text>
+                </View>
+                <View style={styles.terminalCell}>
+                  <Text style={styles.terminalLabel}>Reserved shares</Text>
+                  <Text style={styles.terminalValue}>
+                    {formatShares(tradeAvailability.reservedQuantity)}
                   </Text>
                 </View>
                 <View style={styles.terminalCell}>

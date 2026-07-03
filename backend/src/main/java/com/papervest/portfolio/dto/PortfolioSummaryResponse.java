@@ -5,6 +5,8 @@ import java.math.BigDecimal;
 public record PortfolioSummaryResponse(
 		BigDecimal initialCash,
 		BigDecimal cashBalance,
+		BigDecimal reservedCashBalance,
+		BigDecimal availableCashBalance,
 		BigDecimal holdingsMarketValue,
 		BigDecimal totalPortfolioValue,
 		BigDecimal unrealizedPnl,

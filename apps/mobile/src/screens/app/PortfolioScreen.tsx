@@ -73,7 +73,8 @@ export function PortfolioScreen() {
       <View style={styles.metricWrap}>
         {summary ? (
           <>
-            <MetricCard label="Cash" value={formatCurrency(summary.cashBalance)} />
+            <MetricCard label="Buying power" value={formatCurrency(summary.availableCashBalance)} />
+            <MetricCard label="Reserved cash" value={formatCurrency(summary.reservedCashBalance)} />
             <MetricCard
               label="Unrealized P&L"
               value={formatSignedCurrency(summary.unrealizedPnl)}
@@ -149,8 +150,16 @@ export function PortfolioScreen() {
 
                   <View style={styles.holdingStats}>
                     <MetricCard
-                      label="Shares"
-                      value={formatShares(holding.quantity)}
+                      label="Available"
+                      value={formatShares(holding.availableQuantity)}
+                      style={styles.holdingStatCard}
+                      labelStyle={styles.holdingStatLabel}
+                      valueStyle={styles.holdingStatValue}
+                      valueNumberOfLines={1}
+                    />
+                    <MetricCard
+                      label="Reserved"
+                      value={formatShares(holding.reservedQuantity)}
                       style={styles.holdingStatCard}
                       labelStyle={styles.holdingStatLabel}
                       valueStyle={styles.holdingStatValue}

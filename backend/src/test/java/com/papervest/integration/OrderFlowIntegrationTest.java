@@ -207,6 +207,13 @@ class OrderFlowIntegrationTest {
 		assertThat(reservationAmount).isEqualByComparingTo("298.50");
 		assertThat(tradeCount).isZero();
 
+		mockMvc.perform(get("/api/portfolio")
+						.header("Authorization", "Bearer " + auth.accessToken()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.summary.cashBalance").value(100000.00))
+				.andExpect(jsonPath("$.summary.reservedCashBalance").value(298.50))
+				.andExpect(jsonPath("$.summary.availableCashBalance").value(99701.50));
+
 		mockMvc.perform(post("/api/orders/{orderId}/cancel", orderId)
 						.header("Authorization", "Bearer " + auth.accessToken()))
 				.andExpect(status().isOk())
@@ -278,6 +285,13 @@ class OrderFlowIntegrationTest {
 
 		assertThat(reservedQuantity).isEqualByComparingTo("4.0000");
 		assertThat(reservationQuantityDelta).isEqualByComparingTo("-4.0000");
+
+		mockMvc.perform(get("/api/portfolio")
+						.header("Authorization", "Bearer " + auth.accessToken()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.holdings[0].quantity").value(10.0000))
+				.andExpect(jsonPath("$.holdings[0].reservedQuantity").value(4.0000))
+				.andExpect(jsonPath("$.holdings[0].availableQuantity").value(6.0000));
 
 		mockMvc.perform(post("/api/orders/{orderId}/cancel", orderId)
 						.header("Authorization", "Bearer " + auth.accessToken()))

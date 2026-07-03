@@ -27,6 +27,7 @@ import { queryKeys } from '../../services/api/queryKeys';
 import { appTheme } from '../../theme';
 import { formatCurrency, formatMarketTimestamp, formatShares } from '../../utils/formatters';
 import { describeMarketSession } from '../../utils/marketSession';
+import { getTradeAvailability } from '../../utils/tradeAvailability';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'TradeTicket'>;
 
@@ -87,8 +88,10 @@ export function TradeTicketScreen({ navigation, route }: Props) {
   const quantity = normalizeTradeQuantity(watch('quantity') || '0');
   const estimatedTotal = quantity * currentPrice;
   const holding = portfolioQuery.data?.holdings.find((item) => item.symbol === symbol);
-  const cashBalance = portfolioQuery.data?.summary.cashBalance ?? 0;
-  const maxSellableQuantity = holding?.quantity ?? 0;
+  const tradeAvailability = getTradeAvailability(portfolioQuery.data?.summary, holding);
+  const cashBalance = tradeAvailability.cashBalance;
+  const availableCashBalance = tradeAvailability.availableCashBalance;
+  const maxSellableQuantity = tradeAvailability.availableQuantity;
   const marketSession = stockQuery.data ? describeMarketSession(stockQuery.data.marketSession) : null;
   const tradingBlockedMessage = stockQuery.data && !stockQuery.data.tradingEnabled
     ? `${marketSession?.statusLabel} session. Paper trading is only available during regular market hours.`
@@ -102,13 +105,13 @@ export function TradeTicketScreen({ navigation, route }: Props) {
       return;
     }
 
-    if (side === 'BUY' && estimatedTotal > cashBalance) {
-      Alert.alert('Not enough virtual cash', 'Lower the quantity or choose a less expensive stock.');
+    if (side === 'BUY' && estimatedTotal > availableCashBalance) {
+      Alert.alert('Not enough buying power', 'Lower the quantity or cancel an open buy order first.');
       return;
     }
 
     if (side === 'SELL' && normalizedQuantity > maxSellableQuantity) {
-      Alert.alert('Too many shares', 'You cannot sell more shares than you currently own.');
+      Alert.alert('Too many shares', 'You cannot sell more shares than your available unreserved position.');
       return;
     }
 
@@ -186,13 +189,16 @@ export function TradeTicketScreen({ navigation, route }: Props) {
 
       <View style={styles.infoCard}>
         <InfoRow
-          label={side === 'BUY' ? 'Available cash' : 'Shares available'}
+          label={side === 'BUY' ? 'Buying power' : 'Shares available'}
           value={
             side === 'BUY'
-              ? formatCurrency(cashBalance)
+              ? formatCurrency(availableCashBalance)
               : formatShares(maxSellableQuantity)
           }
         />
+        {side === 'BUY' ? (
+          <InfoRow label="Cash balance" value={formatCurrency(cashBalance)} />
+        ) : null}
         <InfoRow label="Estimated total" value={formatCurrency(estimatedTotal || 0)} />
       </View>
 

@@ -204,6 +204,8 @@ export type Holding = {
   symbol: string;
   companyName: string;
   quantity: number;
+  reservedQuantity: number;
+  availableQuantity: number;
   averageCost: number;
   currentPrice: number;
   costBasis: number;
@@ -221,6 +223,8 @@ export type Holding = {
 export type PortfolioSummary = {
   initialCash: number;
   cashBalance: number;
+  reservedCashBalance: number;
+  availableCashBalance: number;
   holdingsMarketValue: number;
   totalPortfolioValue: number;
   unrealizedPnl: number;
