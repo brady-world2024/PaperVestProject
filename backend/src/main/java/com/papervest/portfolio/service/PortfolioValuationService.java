@@ -74,6 +74,8 @@ public class PortfolioValuationService {
 		PortfolioSummaryResponse summary = new PortfolioSummaryResponse(
 				account.getInitialCash(),
 				account.getCashBalance(),
+				account.getReservedCashBalance(),
+				account.getAvailableCashBalance(),
 				holdingsMarketValue,
 				totalPortfolioValue,
 				unrealizedPnl,
@@ -109,6 +111,8 @@ public class PortfolioValuationService {
 				holding.getSymbol(),
 				holding.getCompanyName(),
 				holding.getQuantity(),
+				holding.getReservedQuantity(),
+				holding.getAvailableQuantity(),
 				holding.getAverageCost(),
 				currentPrice,
 				costBasis,

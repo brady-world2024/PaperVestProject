@@ -9,6 +9,8 @@ public record HoldingResponse(
 		String symbol,
 		String companyName,
 		BigDecimal quantity,
+		BigDecimal reservedQuantity,
+		BigDecimal availableQuantity,
 		BigDecimal averageCost,
 		BigDecimal currentPrice,
 		BigDecimal costBasis,
