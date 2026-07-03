@@ -11,11 +11,11 @@ import com.papervest.conditionalorder.model.ConditionalOrderFailureCode;
 import com.papervest.conditionalorder.model.ConditionalOrderStatus;
 import com.papervest.marketdata.model.StockQuote;
 import com.papervest.marketdata.service.MarketDataService;
+import com.papervest.orders.service.OrderService;
 import com.papervest.trading.dto.TradeExecutionResponse;
 import com.papervest.trading.dto.TradeOrderRequest;
 import com.papervest.trading.model.Trade;
 import com.papervest.trading.repository.TradeRepository;
-import com.papervest.trading.service.TradeService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
@@ -42,7 +42,7 @@ public class ConditionalOrderExecutionService {
 	private final ConditionalOrderTransitionService transitionService;
 	private final MarketDataService marketDataService;
 	private final ConditionalOrderMessagePublisher messagePublisher;
-	private final TradeService tradeService;
+	private final OrderService orderService;
 	private final TradeRepository tradeRepository;
 	private final Clock clock;
 
@@ -52,7 +52,7 @@ public class ConditionalOrderExecutionService {
 			ConditionalOrderTransitionService transitionService,
 			MarketDataService marketDataService,
 			ConditionalOrderMessagePublisher messagePublisher,
-			TradeService tradeService,
+			OrderService orderService,
 			TradeRepository tradeRepository,
 			Clock clock
 	) {
@@ -61,7 +61,7 @@ public class ConditionalOrderExecutionService {
 		this.transitionService = transitionService;
 		this.marketDataService = marketDataService;
 		this.messagePublisher = messagePublisher;
-		this.tradeService = tradeService;
+		this.orderService = orderService;
 		this.tradeRepository = tradeRepository;
 		this.clock = clock;
 	}
@@ -166,7 +166,7 @@ public class ConditionalOrderExecutionService {
 						existingTrade.get().getExecutedAt(),
 						ConditionalOrderFailureCode.ORDER_ALREADY_EXECUTED.name(),
 						"Order execution was already persisted",
-						Map.of("tradeId", existingTrade.get().getId().toString())
+						existingTradeMetadata(existingTrade.get())
 				);
 				if (markedFilled) {
 					log.info(
@@ -275,16 +275,17 @@ public class ConditionalOrderExecutionService {
 					existingTrade.get().getExecutedAt(),
 					ConditionalOrderFailureCode.ORDER_ALREADY_EXECUTED.name(),
 					"Order execution was already persisted",
-					Map.of("tradeId", existingTrade.get().getId().toString())
+					existingTradeMetadata(existingTrade.get())
 			);
 			return;
 		}
 
 		try {
-			TradeExecutionResponse trade = tradeService.executeConditionalOrder(
+			TradeExecutionResponse trade = orderService.submitConditionalMarketOrder(
 					order.getUserId(),
 					new TradeOrderRequest(order.getSymbol(), order.getSymbol(), order.getQuantity()),
 					order.getSide(),
+					order.getId(),
 					order.getExecutionKey(),
 					quote
 			);
@@ -294,11 +295,7 @@ public class ConditionalOrderExecutionService {
 					trade.executedAt(),
 					"ORDER_FILLED",
 					"Conditional order executed successfully",
-					Map.of(
-							"tradeId", trade.tradeId().toString(),
-							"executedPrice", trade.executedPrice(),
-							"grossAmount", trade.grossAmount()
-					)
+					executedTradeMetadata(trade)
 			);
 			log.info(
 					"Conditional order filled orderId={} tradeId={} symbol={} side={} filled={}",
@@ -332,6 +329,25 @@ public class ConditionalOrderExecutionService {
 					ex
 			);
 		}
+	}
+
+	private Map<String, Object> executedTradeMetadata(TradeExecutionResponse trade) {
+		Map<String, Object> metadata = new LinkedHashMap<>();
+		metadata.put("tradeId", trade.tradeId().toString());
+		metadata.put("orderId", trade.orderId().toString());
+		metadata.put("orderStatus", trade.orderStatus());
+		metadata.put("executedPrice", trade.executedPrice());
+		metadata.put("grossAmount", trade.grossAmount());
+		return metadata;
+	}
+
+	private Map<String, Object> existingTradeMetadata(Trade trade) {
+		Map<String, Object> metadata = new LinkedHashMap<>();
+		metadata.put("tradeId", trade.getId().toString());
+		if (trade.getOrderId() != null) {
+			metadata.put("orderId", trade.getOrderId().toString());
+		}
+		return metadata;
 	}
 
 	private void failOrder(

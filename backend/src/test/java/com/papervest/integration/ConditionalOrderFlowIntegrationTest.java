@@ -14,6 +14,18 @@ import com.papervest.conditionalorder.service.ConditionalOrderExecutionService;
 import com.papervest.marketdata.model.MarketSessionState;
 import com.papervest.marketdata.model.StockQuote;
 import com.papervest.marketdata.service.MarketDataService;
+import com.papervest.ledger.model.CashLedgerEntry;
+import com.papervest.ledger.model.CashLedgerEntryType;
+import com.papervest.ledger.model.PositionLedgerEntry;
+import com.papervest.ledger.model.PositionLedgerEntryType;
+import com.papervest.ledger.repository.CashLedgerEntryRepository;
+import com.papervest.ledger.repository.PositionLedgerEntryRepository;
+import com.papervest.orders.model.Order;
+import com.papervest.orders.model.OrderSource;
+import com.papervest.orders.model.OrderStatus;
+import com.papervest.orders.model.OrderStatusEvent;
+import com.papervest.orders.repository.OrderRepository;
+import com.papervest.orders.repository.OrderStatusEventRepository;
 import com.papervest.portfolio.model.UserAccount;
 import com.papervest.portfolio.repository.UserAccountRepository;
 import com.papervest.trading.model.Trade;
@@ -81,6 +93,18 @@ class ConditionalOrderFlowIntegrationTest {
 
 	@Autowired
 	private TradeRepository tradeRepository;
+
+	@Autowired
+	private OrderRepository orderRepository;
+
+	@Autowired
+	private OrderStatusEventRepository orderStatusEventRepository;
+
+	@Autowired
+	private CashLedgerEntryRepository cashLedgerEntryRepository;
+
+	@Autowired
+	private PositionLedgerEntryRepository positionLedgerEntryRepository;
 
 	@Autowired
 	private HoldingRepository holdingRepository;
@@ -244,6 +268,60 @@ class ConditionalOrderFlowIntegrationTest {
 						ConditionalOrderStatus.EXECUTING,
 						ConditionalOrderStatus.FILLED
 				);
+	}
+
+	@Test
+	void triggeredConditionalOrderCreatesFilledOmsChildOrderAndLedgerLinks() throws Exception {
+		AuthSession session = registerUser();
+		ConditionalOrder conditionalOrder = createOrder(session.accessToken(), "BUY", "100.00", "5.0");
+
+		when(marketDataService.getQuote("AAPL", null)).thenReturn(stockQuote("99.0000"));
+
+		conditionalOrderExecutionService.scanAndTriggerReadyOrders();
+		conditionalOrderExecutionService.handleTriggeredOrder(conditionalOrder.getId());
+
+		Trade trade = tradeRepository.findByExecutionKey(conditionalOrder.getExecutionKey()).orElseThrow();
+		assertThat(trade.getOrderId()).isNotNull();
+
+		Order childOrder = orderRepository.findById(trade.getOrderId()).orElseThrow();
+		assertThat(childOrder.getUserId()).isEqualTo(session.userId());
+		assertThat(childOrder.getSource()).isEqualTo(OrderSource.CONDITIONAL_ORDER);
+		assertThat(childOrder.getSourceRefId()).isEqualTo(conditionalOrder.getId());
+		assertThat(childOrder.getStatus()).isEqualTo(OrderStatus.FILLED);
+		assertThat(childOrder.getRequestedQuantity()).isEqualByComparingTo("5.0000");
+		assertThat(childOrder.getFilledQuantity()).isEqualByComparingTo("5.0000");
+		assertThat(childOrder.getEstimatedGrossAmount()).isEqualByComparingTo("495.00");
+		assertThat(childOrder.getIdempotencyKey()).isEqualTo(conditionalOrder.getExecutionKey());
+
+		List<OrderStatusEvent> orderEvents = orderStatusEventRepository.findByOrderIdOrderByCreatedAtAsc(childOrder.getId());
+		assertThat(orderEvents).extracting(OrderStatusEvent::getToStatus)
+				.containsExactly(OrderStatus.CREATED, OrderStatus.ACCEPTED, OrderStatus.FILLED);
+
+		List<CashLedgerEntry> cashEntries = cashLedgerEntryRepository.findAll().stream()
+				.filter(entry -> childOrder.getId().equals(entry.getOrderId()))
+				.toList();
+		assertThat(cashEntries).hasSize(1);
+		assertThat(cashEntries.get(0).getTradeId()).isEqualTo(trade.getId());
+		assertThat(cashEntries.get(0).getEntryType()).isEqualTo(CashLedgerEntryType.TRADE_DEBIT);
+		assertThat(cashEntries.get(0).getAmount()).isEqualByComparingTo("-495.00");
+
+		List<PositionLedgerEntry> positionEntries = positionLedgerEntryRepository.findAll().stream()
+				.filter(entry -> childOrder.getId().equals(entry.getOrderId()))
+				.toList();
+		assertThat(positionEntries).hasSize(1);
+		assertThat(positionEntries.get(0).getTradeId()).isEqualTo(trade.getId());
+		assertThat(positionEntries.get(0).getEntryType()).isEqualTo(PositionLedgerEntryType.TRADE_BUY);
+		assertThat(positionEntries.get(0).getQuantityDelta()).isEqualByComparingTo("5.0000");
+
+		ConditionalOrder reloaded = conditionalOrderRepository.findById(conditionalOrder.getId()).orElseThrow();
+		assertThat(reloaded.getStatus()).isEqualTo(ConditionalOrderStatus.FILLED);
+
+		ConditionalOrderStatusEvent filledEvent = eventRepository.findByConditionalOrderIdOrderByCreatedAtAsc(conditionalOrder.getId())
+				.stream()
+				.filter(event -> event.getToStatus() == ConditionalOrderStatus.FILLED)
+				.findFirst()
+				.orElseThrow();
+		assertThat(filledEvent.getMetadataJson()).contains(childOrder.getId().toString(), trade.getId().toString());
 	}
 
 	@Test

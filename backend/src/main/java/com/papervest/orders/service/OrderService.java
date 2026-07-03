@@ -101,7 +101,14 @@ public class OrderService {
 		if (normalizedIdempotencyKey != null) {
 			Optional<Order> existingOrder = orderRepository.findByUserIdAndIdempotencyKey(userId, normalizedIdempotencyKey);
 			if (existingOrder.isPresent()) {
-				return toMarketTradeResponseForExistingOrder(existingOrder.get());
+				return toMarketTradeResponseForExistingOrder(
+						existingOrder.get(),
+						OrderSource.USER,
+						null,
+						normalizedSymbol,
+						normalizedQuantity,
+						side
+				);
 			}
 		}
 
@@ -115,7 +122,57 @@ public class OrderService {
 				normalizedSymbol,
 				normalizedQuantity,
 				normalizedIdempotencyKey,
-				quote
+				quote,
+				OrderSource.USER,
+				null,
+				null
+		));
+	}
+
+	public TradeExecutionResponse submitConditionalMarketOrder(
+			UUID userId,
+			TradeOrderRequest request,
+			TradeSide side,
+			UUID conditionalOrderId,
+			String executionKey,
+			StockQuote quote
+	) {
+		String normalizedSymbol = SymbolUtils.normalize(request.symbol());
+		BigDecimal normalizedQuantity = MoneyUtils.scaleQuantity(request.quantity());
+		String normalizedExecutionKey = normalizeExecutionKey(executionKey);
+
+		if (conditionalOrderId == null) {
+			throw new InvalidTradeException("INVALID_SOURCE_REF", "Conditional order id is required");
+		}
+		if (normalizedQuantity.compareTo(BigDecimal.ZERO) <= 0) {
+			throw new InvalidTradeException("INVALID_QUANTITY", "Quantity must be greater than zero");
+		}
+
+		Optional<Order> existingOrder = orderRepository.findByUserIdAndIdempotencyKey(userId, normalizedExecutionKey);
+		if (existingOrder.isPresent()) {
+			return toMarketTradeResponseForExistingOrder(
+					existingOrder.get(),
+					OrderSource.CONDITIONAL_ORDER,
+					conditionalOrderId,
+					normalizedSymbol,
+					normalizedQuantity,
+					side
+			);
+		}
+
+		validateTradingWindow(quote);
+
+		return transactionTemplate.execute(status -> persistMarketOrder(
+				userId,
+				request,
+				side,
+				normalizedSymbol,
+				normalizedQuantity,
+				normalizedExecutionKey,
+				quote,
+				OrderSource.CONDITIONAL_ORDER,
+				conditionalOrderId,
+				normalizedExecutionKey
 		));
 	}
 
@@ -217,12 +274,22 @@ public class OrderService {
 			String normalizedSymbol,
 			BigDecimal normalizedQuantity,
 			String normalizedIdempotencyKey,
-			StockQuote quote
+			StockQuote quote,
+			OrderSource source,
+			UUID sourceRefId,
+			String tradeExecutionKey
 	) {
 		if (normalizedIdempotencyKey != null) {
 			Optional<Order> existingOrder = orderRepository.findByUserIdAndIdempotencyKey(userId, normalizedIdempotencyKey);
 			if (existingOrder.isPresent()) {
-				return toMarketTradeResponseForExistingOrder(existingOrder.get());
+				return toMarketTradeResponseForExistingOrder(
+						existingOrder.get(),
+						source,
+						sourceRefId,
+						normalizedSymbol,
+						normalizedQuantity,
+						side
+				);
 			}
 		}
 
@@ -233,8 +300,8 @@ public class OrderService {
 				side,
 				OrderType.MARKET,
 				OrderTimeInForce.IOC,
-				OrderSource.USER,
-				null,
+				source,
+				sourceRefId,
 				normalizedQuantity,
 				null,
 				null,
@@ -298,7 +365,7 @@ public class OrderService {
 				realizedPnl,
 				account.getCashBalance(),
 				normalizedIdempotencyKey,
-				null,
+				tradeExecutionKey,
 				order.getId()
 		));
 
@@ -505,8 +572,23 @@ public class OrderService {
 		return toTradeResponse(trade, order, idempotentReplay);
 	}
 
-	private TradeExecutionResponse toMarketTradeResponseForExistingOrder(Order order) {
-		if (order.getOrderType() != OrderType.MARKET || order.getStatus() != OrderStatus.FILLED) {
+	private TradeExecutionResponse toMarketTradeResponseForExistingOrder(
+			Order order,
+			OrderSource source,
+			UUID sourceRefId,
+			String normalizedSymbol,
+			BigDecimal normalizedQuantity,
+			TradeSide side
+	) {
+		if (
+				order.getOrderType() != OrderType.MARKET ||
+						order.getStatus() != OrderStatus.FILLED ||
+						order.getSource() != source ||
+						!sameOptionalUuid(order.getSourceRefId(), sourceRefId) ||
+						order.getSide() != side ||
+						!order.getSymbol().equals(normalizedSymbol) ||
+						order.getRequestedQuantity().compareTo(normalizedQuantity) != 0
+		) {
 			throw idempotencyKeyConflict();
 		}
 		return toTradeResponseForOrder(order, true);
@@ -541,6 +623,13 @@ public class OrderService {
 			return left == right;
 		}
 		return left.compareTo(right) == 0;
+	}
+
+	private boolean sameOptionalUuid(UUID left, UUID right) {
+		if (left == null || right == null) {
+			return left == right;
+		}
+		return left.equals(right);
 	}
 
 	private InvalidTradeException idempotencyKeyConflict() {
@@ -603,6 +692,17 @@ public class OrderService {
 		String trimmed = idempotencyKey.trim();
 		if (trimmed.length() > 120) {
 			throw new InvalidTradeException("INVALID_IDEMPOTENCY_KEY", "Idempotency key is too long");
+		}
+		return trimmed;
+	}
+
+	private String normalizeExecutionKey(String executionKey) {
+		if (executionKey == null || executionKey.isBlank()) {
+			throw new InvalidTradeException("INVALID_EXECUTION_KEY", "Execution key is required");
+		}
+		String trimmed = executionKey.trim();
+		if (trimmed.length() > 120) {
+			throw new InvalidTradeException("INVALID_EXECUTION_KEY", "Execution key is too long");
 		}
 		return trimmed;
 	}
