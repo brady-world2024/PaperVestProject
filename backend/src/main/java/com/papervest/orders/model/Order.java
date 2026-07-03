@@ -189,6 +189,10 @@ public class Order {
 		return previousStatus;
 	}
 
+	public void assignExpiration(Instant expiresAt) {
+		this.expiresAt = expiresAt;
+	}
+
 	public void reserveCash(BigDecimal amount) {
 		reservedCashAmount = MoneyUtils.scaleMoney(reservedCashAmount.add(amount));
 	}
@@ -210,6 +214,13 @@ public class Order {
 		status = OrderStatus.CANCELLED;
 		cancelledAt = Instant.now();
 		completedAt = cancelledAt;
+		return previousStatus;
+	}
+
+	public OrderStatus expire() {
+		OrderStatus previousStatus = status;
+		status = OrderStatus.EXPIRED;
+		completedAt = Instant.now();
 		return previousStatus;
 	}
 

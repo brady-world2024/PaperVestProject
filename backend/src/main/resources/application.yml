@@ -127,6 +127,11 @@ app:
       routing-key: ${APP_CONDITIONAL_ORDERS_ROUTING_KEY:conditional-orders.execute}
       listener-enabled: ${APP_CONDITIONAL_ORDERS_LISTENER_ENABLED:true}
   orders:
+    expiration:
+      scheduler:
+        enabled: ${APP_ORDER_EXPIRATION_SCHEDULER_ENABLED:true}
+        batch-size: ${APP_ORDER_EXPIRATION_BATCH_SIZE:100}
+        fixed-delay-ms: ${APP_ORDER_EXPIRATION_FIXED_DELAY_MS:10000}
     execution:
       scheduler:
         enabled: ${APP_ORDER_EXECUTION_SCHEDULER_ENABLED:true}

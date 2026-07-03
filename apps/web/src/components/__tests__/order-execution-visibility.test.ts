@@ -44,6 +44,20 @@ test('order execution presentation describes pending orders without a trigger re
   assert.equal(orderExecutionTone(baseOrder), 'neutral');
 });
 
+test('order execution presentation describes expired orders without a trigger request', () => {
+  const expiredOrder: Order = {
+    ...baseOrder,
+    status: 'EXPIRED',
+    reservedCashAmount: 0,
+    completedAt: '2026-07-03T20:00:00Z',
+    expiresAt: '2026-07-03T20:00:00Z',
+  };
+
+  assert.equal(orderExecutionLabel(expiredOrder), 'Expired');
+  assert.equal(orderExecutionDetail(expiredOrder), 'Reservation released');
+  assert.equal(orderExecutionTone(expiredOrder), 'neutral');
+});
+
 test('order execution presentation describes published and consumed execution requests', () => {
   const publishedOrder: Order = {
     ...baseOrder,

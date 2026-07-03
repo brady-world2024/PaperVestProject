@@ -6,6 +6,9 @@ export type OrderExecutionTone = 'neutral' | 'positive' | 'warning' | 'danger';
 
 export function orderExecutionLabel(order: Order) {
   if (!order.execution) {
+    if (order.status === 'EXPIRED') {
+      return 'Expired';
+    }
     return order.status === 'PENDING' ? 'Not triggered yet' : 'Immediate fill';
   }
 
@@ -25,6 +28,9 @@ export function orderExecutionLabel(order: Order) {
 
 export function orderExecutionDetail(order: Order) {
   if (!order.execution) {
+    if (order.status === 'EXPIRED') {
+      return 'Reservation released';
+    }
     return order.status === 'PENDING' ? 'Waiting for market conditions' : 'No async execution request';
   }
 
@@ -46,6 +52,9 @@ export function orderExecutionDetail(order: Order) {
 
 export function orderExecutionTone(order: Order): OrderExecutionTone {
   if (!order.execution) {
+    if (order.status === 'EXPIRED') {
+      return 'neutral';
+    }
     return order.status === 'PENDING' ? 'neutral' : 'positive';
   }
 
