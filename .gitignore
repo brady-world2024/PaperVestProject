@@ -6,6 +6,7 @@ backend/.env
 backend/.env.development
 .idea
 .vscode
+.worktrees/
 
 backend/target
 backend/.mvn/wrapper/maven-wrapper.jar
