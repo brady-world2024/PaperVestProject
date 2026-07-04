@@ -43,6 +43,11 @@ type Props = {
     label: string;
     copy: string;
   };
+  successAction?: {
+    href: string;
+    label: string;
+    copy: string;
+  };
   buttonVariant?: 'primary' | 'secondary' | 'ghost' | 'danger';
   pending: boolean;
   errorMessage?: string | null;
@@ -69,6 +74,7 @@ export function TradeOrderCard({
   supportLabel,
   supportValue,
   followThroughAction,
+  successAction,
   buttonVariant = 'primary',
   pending,
   errorMessage,
@@ -161,6 +167,12 @@ export function TradeOrderCard({
         {errorMessage ? <InlineNotice tone="error" message={errorMessage} /> : null}
         {blockingMessage ? <InlineNotice tone="error" message={blockingMessage} /> : null}
         {successMessage ? <InlineNotice tone="info" message={successMessage} /> : null}
+        {successMessage && successAction ? (
+          <Link className="pv-trade-followthrough" href={successAction.href}>
+            <strong>{successAction.label}</strong>
+            <span>{successAction.copy}</span>
+          </Link>
+        ) : null}
 
         <AppField
           label="Quantity"

@@ -607,6 +607,11 @@ export default function StockDetailPage() {
                   ? formatOrderSuccessMessage('Buy', buyMutation.data?.orderId, buyMutation.data?.orderStatus)
                   : null
               }
+              successAction={{
+                href: '/orders',
+                label: 'View order lifecycle',
+                copy: 'Open the OMS blotter to inspect fill, execution, and reservation state.',
+              }}
               getBlockingMessage={(quantity) =>
                 quantity * currentPrice > availableCashBalance
                   ? 'This estimated order is larger than your available buying power.'
@@ -653,6 +658,11 @@ export default function StockDetailPage() {
                   ? formatOrderSuccessMessage('Sell', sellMutation.data?.orderId, sellMutation.data?.orderStatus)
                   : null
               }
+              successAction={{
+                href: '/orders',
+                label: 'View order lifecycle',
+                copy: 'Open the OMS blotter to inspect fill, execution, and released share reservation state.',
+              }}
               getBlockingMessage={(quantity) =>
                 quantity > availableToSell
                   ? 'You cannot sell more shares than your available unreserved position.'

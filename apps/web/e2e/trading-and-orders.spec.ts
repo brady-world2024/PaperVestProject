@@ -23,6 +23,14 @@ test('buy flow and conditional order creation work through the web UI', async ({
   expect(buyResponse.status()).toBe(200);
   await expect(page.getByText('Buy order simulated successfully.')).toBeVisible();
   await expect(page.getByText('Shares owned').first()).toBeVisible();
+  await expect(page.getByRole('link', { name: /View order lifecycle/ })).toBeVisible();
+
+  await page.getByRole('link', { name: /View order lifecycle/ }).click();
+  await expect(page.getByText('OMS blotter')).toBeVisible();
+  await expect(page.getByText('AAPL').first()).toBeVisible();
+  await expect(page.getByText('Order filled').first()).toBeVisible();
+  await expect(page.getByText('Consumed').first()).toBeVisible();
+  await expect(page.getByText('Immediate fill').first()).toBeVisible();
 
   await page.goto('/orders?symbol=AAPL&side=BUY');
 

@@ -1,5 +1,9 @@
 import type { Order } from '../../services/api/types';
 import {
+  orderExecutionDetail as sharedOrderExecutionDetail,
+  orderExecutionLabel as sharedOrderExecutionLabel,
+} from '@papervest/shared-types';
+import {
   orderExecutionDetail,
   orderExecutionLabel,
 } from '../../utils/orderExecution';
@@ -34,6 +38,11 @@ const baseOrder: Order = {
 };
 
 describe('order execution presentation', () => {
+  it('re-exports the shared OMS helpers', () => {
+    expect(orderExecutionLabel).toBe(sharedOrderExecutionLabel);
+    expect(orderExecutionDetail).toBe(sharedOrderExecutionDetail);
+  });
+
   it('describes a pending order that has not triggered yet', () => {
     expect(orderExecutionLabel(baseOrder)).toBe('Not triggered yet');
     expect(orderExecutionDetail(baseOrder)).toBe('Waiting for market conditions');
