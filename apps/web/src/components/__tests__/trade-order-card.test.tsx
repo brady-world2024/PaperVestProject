@@ -39,3 +39,35 @@ test('trade order card renders quick size controls and impact preview', () => {
   assert.match(html, /Position weight/);
   assert.match(html, /Plan a target-price exit/);
 });
+
+test('trade order card renders success follow-through only after a successful trade', () => {
+  const html = renderToStaticMarkup(
+    <TradeOrderCard
+      symbol="AAPL"
+      side="BUY"
+      title="Buy shares"
+      submitLabel="Place buy order"
+      currentPrice={100}
+      cashBalance={1000}
+      totalPortfolioValue={1000}
+      holdingQuantity={0}
+      holdingAverageCost={0}
+      holdingMarketValue={0}
+      availableLabel="Buying power"
+      availableValue="$1,000.00"
+      supportLabel="Execution source"
+      supportValue="Current backend quote"
+      pending={false}
+      successMessage="Buy order filled. OMS id order-1."
+      successAction={{
+        href: '/orders',
+        label: 'View order lifecycle',
+        copy: 'Open the OMS blotter to inspect fill and reservation state.',
+      }}
+      onSubmitQuantity={async () => undefined}
+    />
+  );
+
+  assert.match(html, /View order lifecycle/);
+  assert.match(html, /Open the OMS blotter/);
+});
