@@ -1,5 +1,7 @@
 package com.papervest.portfolio.service;
 
+import com.papervest.ledger.model.CashLedgerEntryType;
+import com.papervest.ledger.repository.CashLedgerEntryRepository;
 import com.papervest.portfolio.dto.PortfolioResponse;
 import com.papervest.portfolio.dto.PortfolioSummaryResponse;
 import com.papervest.portfolio.model.DailyPerformanceSnapshot;
@@ -12,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -30,6 +33,9 @@ class DailyPerformanceSnapshotServiceTest {
 	@Mock
 	private PortfolioValuationService portfolioValuationService;
 
+	@Mock
+	private CashLedgerEntryRepository cashLedgerEntryRepository;
+
 	private DailyPerformanceSnapshotService service;
 
 	@BeforeEach
@@ -37,6 +43,7 @@ class DailyPerformanceSnapshotServiceTest {
 		service = new DailyPerformanceSnapshotService(
 				dailyPerformanceSnapshotRepository,
 				portfolioValuationService,
+				cashLedgerEntryRepository,
 				new PerformanceReturnCalculator()
 		);
 	}
@@ -130,6 +137,42 @@ class DailyPerformanceSnapshotServiceTest {
 
 		DailyPerformanceSnapshot snapshot = service.recordDailySnapshot(userId, performanceDate);
 
+		assertThat(snapshot.getPeriodReturnPercent()).isEqualByComparingTo("10.00");
+		assertThat(snapshot.getCumulativeTwrPercent()).isEqualByComparingTo("10.00");
+		assertThat(snapshot.getCumulativeMwrPercent()).isEqualByComparingTo("10.00");
+	}
+
+	@Test
+	void usesExternalCashLedgerEntriesAsNetCashFlowForPerformanceDate() {
+		UUID userId = UUID.randomUUID();
+		LocalDate priorDate = LocalDate.parse("2025-07-05");
+		LocalDate performanceDate = LocalDate.parse("2026-07-05");
+		DailyPerformanceSnapshot prior = snapshot(userId, priorDate, "100000.00", "0.00", "0.00", null);
+		when(portfolioValuationService.getPortfolio(userId)).thenReturn(portfolio(
+				"120000.00",
+				"90000.00",
+				"30000.00",
+				"0.00",
+				"10000.00"
+		));
+		when(dailyPerformanceSnapshotRepository.findByUserIdAndPerformanceDateLessThanEqualOrderByPerformanceDateAsc(
+				userId,
+				performanceDate
+		)).thenReturn(List.of(prior));
+		when(dailyPerformanceSnapshotRepository.findByUserIdAndPerformanceDate(userId, performanceDate))
+				.thenReturn(Optional.empty());
+		when(cashLedgerEntryRepository.sumAmountByUserIdAndEntryTypeInAndCreatedAtBetween(
+				userId,
+				List.of(CashLedgerEntryType.DEPOSIT, CashLedgerEntryType.WITHDRAWAL),
+				Instant.parse("2026-07-05T04:00:00Z"),
+				Instant.parse("2026-07-06T04:00:00Z")
+		)).thenReturn(new BigDecimal("10000.00"));
+		ArgumentCaptor<DailyPerformanceSnapshot> captor = ArgumentCaptor.forClass(DailyPerformanceSnapshot.class);
+		when(dailyPerformanceSnapshotRepository.save(captor.capture())).thenAnswer(invocation -> invocation.getArgument(0));
+
+		DailyPerformanceSnapshot snapshot = service.recordDailySnapshot(userId, performanceDate);
+
+		assertThat(snapshot.getNetCashFlow()).isEqualByComparingTo("10000.00");
 		assertThat(snapshot.getPeriodReturnPercent()).isEqualByComparingTo("10.00");
 		assertThat(snapshot.getCumulativeTwrPercent()).isEqualByComparingTo("10.00");
 		assertThat(snapshot.getCumulativeMwrPercent()).isEqualByComparingTo("10.00");

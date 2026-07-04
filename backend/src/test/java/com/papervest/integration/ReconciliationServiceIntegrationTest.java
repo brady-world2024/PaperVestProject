@@ -86,6 +86,18 @@ class ReconciliationServiceIntegrationTest {
 	}
 
 	@Test
+	void healthyExternalCashFlowsProduceHealthyReport() throws Exception {
+		AuthContext auth = register();
+		depositCash(auth.accessToken(), "reconcile-deposit-" + UUID.randomUUID(), "1000.00");
+		withdrawCash(auth.accessToken(), "reconcile-withdrawal-" + UUID.randomUUID(), "250.00");
+
+		ReconciliationReport report = reconciliationService.scan();
+
+		assertThat(report.healthy()).isTrue();
+		assertThat(report.issues()).isEmpty();
+	}
+
+	@Test
 	void detectsCashLedgerBalanceMismatch() throws Exception {
 		AuthContext auth = register();
 		buyAapl(auth.accessToken(), 2);
@@ -177,6 +189,34 @@ class ReconciliationServiceIntegrationTest {
 								  "quantity": %d
 								}
 								""".formatted(quantity)))
+				.andExpect(status().isOk());
+	}
+
+	private void depositCash(String token, String idempotencyKey, String amount) throws Exception {
+		mockMvc.perform(post("/api/account/cash-flows/deposits")
+						.header("Authorization", "Bearer " + token)
+						.header("X-Idempotency-Key", idempotencyKey)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "amount": %s,
+								  "memo": "Reconciliation deposit"
+								}
+								""".formatted(amount)))
+				.andExpect(status().isOk());
+	}
+
+	private void withdrawCash(String token, String idempotencyKey, String amount) throws Exception {
+		mockMvc.perform(post("/api/account/cash-flows/withdrawals")
+						.header("Authorization", "Bearer " + token)
+						.header("X-Idempotency-Key", idempotencyKey)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{
+								  "amount": %s,
+								  "memo": "Reconciliation withdrawal"
+								}
+								""".formatted(amount)))
 				.andExpect(status().isOk());
 	}
 

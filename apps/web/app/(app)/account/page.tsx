@@ -6,15 +6,20 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import {
+  cashFlowFormSchema,
   changePasswordFormSchema,
   deleteAccountFormSchema,
+  normalizeCashFlowAmount,
+  type CashFlowFormValues,
   type ChangePasswordFormValues,
   type DeleteAccountFormValues,
 } from '@papervest/validation';
+import type { CashFlowEntryType } from '@papervest/shared-types';
 
 import { AppButton, AppButtonLink } from '@/components/app-button';
 import { AppCard } from '@/components/app-card';
 import { AppField } from '@/components/app-field';
+import { CashFlowPanel } from '@/components/cash-flow-panel';
 import { InlineNotice } from '@/components/inline-notice';
 import { MetricCard } from '@/components/metric-card';
 import { SectionHeader } from '@/components/section-header';
@@ -30,10 +35,30 @@ export default function AccountPage() {
   const clearSession = useAuthStore((state) => state.clearSession);
   const [verificationNotice, setVerificationNotice] = useState<string | null>(null);
   const [changePasswordNotice, setChangePasswordNotice] = useState<string | null>(null);
+  const [cashFlowMode, setCashFlowMode] = useState<CashFlowEntryType>('DEPOSIT');
+  const [cashFlowNotice, setCashFlowNotice] = useState<string | null>(null);
 
   const accountQuery = useQuery({
     queryKey: queryKeys.accountProfile,
     queryFn: webApi.getAccountProfile,
+  });
+
+  const portfolioQuery = useQuery({
+    queryKey: queryKeys.portfolio,
+    queryFn: webApi.getPortfolio,
+  });
+
+  const cashFlowsQuery = useQuery({
+    queryKey: queryKeys.cashFlows,
+    queryFn: webApi.getCashFlows,
+  });
+
+  const cashFlowForm = useForm<CashFlowFormValues>({
+    resolver: zodResolver(cashFlowFormSchema),
+    defaultValues: {
+      amount: '',
+      memo: '',
+    },
   });
 
   const changePasswordForm = useForm<ChangePasswordFormValues>({
@@ -78,6 +103,32 @@ export default function AccountPage() {
     },
   });
 
+  const cashFlowMutation = useMutation({
+    mutationFn: async (values: CashFlowFormValues) => {
+      await webApi.initializeCsrf();
+      const idempotencyKey = `cash-flow-${cashFlowMode.toLowerCase()}-${Date.now()}`;
+      const payload = {
+        amount: normalizeCashFlowAmount(values.amount),
+        memo: values.memo || null,
+      };
+      return cashFlowMode === 'DEPOSIT'
+        ? webApi.depositCash(payload, idempotencyKey)
+        : webApi.withdrawCash(payload, idempotencyKey);
+    },
+    onSuccess: async () => {
+      cashFlowForm.reset({
+        amount: '',
+        memo: '',
+      });
+      setCashFlowNotice(cashFlowMode === 'DEPOSIT' ? 'Simulated deposit recorded.' : 'Simulated withdrawal recorded.');
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.cashFlows }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.portfolio }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.portfolioPerformanceRoot }),
+      ]);
+    },
+  });
+
   const deleteAccountMutation = useMutation({
     mutationFn: async (values: DeleteAccountFormValues) => {
       await webApi.initializeCsrf();
@@ -91,6 +142,13 @@ export default function AccountPage() {
   });
 
   const profile = accountQuery.data;
+  const cashFlowErrorMessage = cashFlowMutation.isError
+    ? webApi.getApiErrorMessage(cashFlowMutation.error, 'Unable to record cash movement')
+    : cashFlowsQuery.isError
+      ? webApi.getApiErrorMessage(cashFlowsQuery.error, 'Unable to load cash flows')
+      : portfolioQuery.isError
+        ? webApi.getApiErrorMessage(portfolioQuery.error, 'Unable to load portfolio cash')
+        : null;
 
   return (
     <main className="pv-page pv-stack">
@@ -153,6 +211,34 @@ export default function AccountPage() {
       </section>
 
       <section className="pv-account-grid">
+        <AppCard>
+          <CashFlowPanel
+            portfolio={portfolioQuery.data}
+            cashFlows={cashFlowsQuery.data?.cashFlows ?? []}
+            mode={cashFlowMode}
+            amount={cashFlowForm.watch('amount')}
+            memo={cashFlowForm.watch('memo') ?? ''}
+            amountError={cashFlowForm.formState.errors.amount?.message}
+            memoError={cashFlowForm.formState.errors.memo?.message}
+            submitting={cashFlowMutation.isPending}
+            loading={cashFlowsQuery.isLoading || portfolioQuery.isLoading}
+            notice={cashFlowNotice}
+            errorMessage={cashFlowErrorMessage}
+            onModeChange={(mode) => {
+              setCashFlowMode(mode);
+              setCashFlowNotice(null);
+            }}
+            onAmountChange={(value) => cashFlowForm.setValue('amount', value, { shouldValidate: true })}
+            onMemoChange={(value) => cashFlowForm.setValue('memo', value, { shouldValidate: true })}
+            onSubmit={() => {
+              setCashFlowNotice(null);
+              void cashFlowForm.handleSubmit(async (values) => {
+                await cashFlowMutation.mutateAsync(values);
+              })();
+            }}
+          />
+        </AppCard>
+
         <AppCard>
           <SectionHeader
             title="Email verification"

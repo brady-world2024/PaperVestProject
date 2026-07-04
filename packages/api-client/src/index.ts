@@ -2,6 +2,9 @@ import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'ax
 
 import type {
   AccountProfile,
+  CashFlow,
+  CashFlowListResponse,
+  CashFlowPayload,
   ProductAnalyticsOverviewResponse,
   ProductAnalyticsWindowDays,
   TrackProductAnalyticsEventPayload,
@@ -294,6 +297,36 @@ export function createPapervestApiClient({
     },
     async getAccountProfile() {
       const { data } = await apiClient.get<AccountProfile>('/account');
+      return data;
+    },
+    async getCashFlows() {
+      const { data } = await apiClient.get<CashFlowListResponse>('/account/cash-flows');
+      return data;
+    },
+    async depositCash(payload: CashFlowPayload, idempotencyKey: string) {
+      const previousCookieToken = resolveCookieCsrfToken();
+      await ensureCookieCsrfToken();
+      const { data } = await apiClient.post<CashFlow>(
+        '/account/cash-flows/deposits',
+        payload,
+        buildCookieWriteConfig({
+          'X-Idempotency-Key': idempotencyKey,
+        })
+      );
+      await stabilizeCookieCsrfToken(previousCookieToken);
+      return data;
+    },
+    async withdrawCash(payload: CashFlowPayload, idempotencyKey: string) {
+      const previousCookieToken = resolveCookieCsrfToken();
+      await ensureCookieCsrfToken();
+      const { data } = await apiClient.post<CashFlow>(
+        '/account/cash-flows/withdrawals',
+        payload,
+        buildCookieWriteConfig({
+          'X-Idempotency-Key': idempotencyKey,
+        })
+      );
+      await stabilizeCookieCsrfToken(previousCookieToken);
       return data;
     },
     async getSupportUsers(query?: string) {

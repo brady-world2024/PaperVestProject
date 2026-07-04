@@ -43,7 +43,7 @@ public class ReconciliationService {
 				  account.initial_cash,
 				  account.cash_balance,
 				  account.reserved_cash_balance,
-				  coalesce(sum(case when ledger.entry_type in ('TRADE_DEBIT', 'TRADE_CREDIT') then ledger.amount else 0 end), 0) as ledger_cash_delta,
+				  coalesce(sum(case when ledger.entry_type in ('TRADE_DEBIT', 'TRADE_CREDIT', 'DEPOSIT', 'WITHDRAWAL') then ledger.amount else 0 end), 0) as ledger_cash_delta,
 				  coalesce(sum(case when ledger.entry_type in ('RESERVATION', 'RELEASE') then ledger.amount else 0 end), 0) as ledger_reserved_delta
 				from user_accounts account
 				left join cash_ledger_entries ledger on ledger.user_id = account.user_id

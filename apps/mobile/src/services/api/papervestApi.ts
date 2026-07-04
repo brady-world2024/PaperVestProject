@@ -1,4 +1,5 @@
 import type {
+  CashFlowPayload,
   ChangePasswordPayload,
   ConfirmEmailVerificationPayload,
   CreateConditionalOrderPayload,
@@ -68,6 +69,18 @@ export function getPortfolio() {
 
 export function getPortfolioPerformance(range: PortfolioPerformanceRange) {
   return papervestApiClient.getPortfolioPerformance(range);
+}
+
+export function getCashFlows() {
+  return papervestApiClient.getCashFlows();
+}
+
+export function depositCash(payload: CashFlowPayload, idempotencyKey: string) {
+  return papervestApiClient.depositCash(payload, idempotencyKey);
+}
+
+export function withdrawCash(payload: CashFlowPayload, idempotencyKey: string) {
+  return papervestApiClient.withdrawCash(payload, idempotencyKey);
 }
 
 export function getAccountProfile() {

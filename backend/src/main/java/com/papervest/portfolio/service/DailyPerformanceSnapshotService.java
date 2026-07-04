@@ -1,5 +1,8 @@
 package com.papervest.portfolio.service;
 
+import com.papervest.common.util.MoneyUtils;
+import com.papervest.ledger.model.CashLedgerEntryType;
+import com.papervest.ledger.repository.CashLedgerEntryRepository;
 import com.papervest.portfolio.dto.PortfolioResponse;
 import com.papervest.portfolio.model.DailyPerformanceSnapshot;
 import com.papervest.portfolio.repository.DailyPerformanceSnapshotRepository;
@@ -7,7 +10,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -16,17 +21,26 @@ import java.util.UUID;
 @Service
 public class DailyPerformanceSnapshotService {
 
+	private static final ZoneId PERFORMANCE_ZONE = ZoneId.of("America/New_York");
+	private static final List<CashLedgerEntryType> EXTERNAL_CASH_FLOW_TYPES = List.of(
+			CashLedgerEntryType.DEPOSIT,
+			CashLedgerEntryType.WITHDRAWAL
+	);
+
 	private final DailyPerformanceSnapshotRepository dailyPerformanceSnapshotRepository;
 	private final PortfolioValuationService portfolioValuationService;
+	private final CashLedgerEntryRepository cashLedgerEntryRepository;
 	private final PerformanceReturnCalculator performanceReturnCalculator;
 
 	public DailyPerformanceSnapshotService(
 			DailyPerformanceSnapshotRepository dailyPerformanceSnapshotRepository,
 			PortfolioValuationService portfolioValuationService,
+			CashLedgerEntryRepository cashLedgerEntryRepository,
 			PerformanceReturnCalculator performanceReturnCalculator
 	) {
 		this.dailyPerformanceSnapshotRepository = dailyPerformanceSnapshotRepository;
 		this.portfolioValuationService = portfolioValuationService;
+		this.cashLedgerEntryRepository = cashLedgerEntryRepository;
 		this.performanceReturnCalculator = performanceReturnCalculator;
 	}
 
@@ -42,10 +56,15 @@ public class DailyPerformanceSnapshotService {
 				.findByUserIdAndPerformanceDate(userId, performanceDate);
 
 		BigDecimal currentValue = portfolio.summary().totalPortfolioValue();
-		BigDecimal netCashFlow = zeroMoney();
+		BigDecimal netCashFlow = calculateNetCashFlow(userId, performanceDate);
 		BigDecimal periodReturnPercent = calculatePeriodReturn(priorSnapshots, currentValue, netCashFlow);
 		BigDecimal cumulativeTwrPercent = calculateCumulativeTwr(priorSnapshots, periodReturnPercent);
-		BigDecimal cumulativeMwrPercent = calculateCumulativeMwr(priorSnapshots, performanceDate, currentValue)
+		BigDecimal cumulativeMwrPercent = calculateCumulativeMwr(
+				priorSnapshots,
+				performanceDate,
+				currentValue,
+				netCashFlow
+		)
 				.orElse(null);
 
 		DailyPerformanceSnapshot snapshot = existingSnapshot.orElseGet(() -> new DailyPerformanceSnapshot(
@@ -79,6 +98,18 @@ public class DailyPerformanceSnapshotService {
 		return dailyPerformanceSnapshotRepository.save(snapshot);
 	}
 
+	private BigDecimal calculateNetCashFlow(UUID userId, LocalDate performanceDate) {
+		Instant fromInclusive = performanceDate.atStartOfDay(PERFORMANCE_ZONE).toInstant();
+		Instant toExclusive = performanceDate.plusDays(1).atStartOfDay(PERFORMANCE_ZONE).toInstant();
+		BigDecimal netCashFlow = cashLedgerEntryRepository.sumAmountByUserIdAndEntryTypeInAndCreatedAtBetween(
+				userId,
+				EXTERNAL_CASH_FLOW_TYPES,
+				fromInclusive,
+				toExclusive
+		);
+		return netCashFlow == null ? zeroMoney() : MoneyUtils.scaleMoney(netCashFlow);
+	}
+
 	private BigDecimal calculatePeriodReturn(
 			List<DailyPerformanceSnapshot> priorSnapshots,
 			BigDecimal currentValue,
@@ -110,7 +141,8 @@ public class DailyPerformanceSnapshotService {
 	private Optional<BigDecimal> calculateCumulativeMwr(
 			List<DailyPerformanceSnapshot> priorSnapshots,
 			LocalDate performanceDate,
-			BigDecimal currentValue
+			BigDecimal currentValue,
+			BigDecimal currentNetCashFlow
 	) {
 		if (priorSnapshots.isEmpty()) {
 			return Optional.empty();
@@ -129,6 +161,12 @@ public class DailyPerformanceSnapshotService {
 						snapshot.getNetCashFlow().negate()
 				));
 			}
+		}
+		if (currentNetCashFlow.compareTo(BigDecimal.ZERO) != 0) {
+			cashFlows.add(new PerformanceReturnCalculator.DatedCashFlow(
+					performanceDate,
+					currentNetCashFlow.negate()
+			));
 		}
 		cashFlows.add(new PerformanceReturnCalculator.DatedCashFlow(performanceDate, currentValue));
 		return performanceReturnCalculator.moneyWeightedReturnPercent(cashFlows);

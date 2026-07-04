@@ -171,6 +171,16 @@ class PostgresIntegrationTest extends AbstractContainerIntegrationTest {
 					where schemaname = 'public'
 					  and tablename = 'cash_ledger_entries'
 					  and indexname = 'ix_cash_ledger_order_created_at'
+				""",
+				Integer.class
+		);
+		Integer cashFlowLedgerDateIndexes = jdbcTemplate.queryForObject(
+				"""
+					select count(*)
+					from pg_indexes
+					where schemaname = 'public'
+					  and tablename = 'cash_ledger_entries'
+					  and indexname = 'ix_cash_ledger_external_flow_user_type_created_at'
 					""",
 				Integer.class
 		);
@@ -253,7 +263,7 @@ class PostgresIntegrationTest extends AbstractContainerIntegrationTest {
 				Integer.class
 		);
 
-		assertThat(appliedMigrations).isEqualTo(10);
+		assertThat(appliedMigrations).isEqualTo(11);
 		assertThat(metadataColumnType).isEqualTo("jsonb");
 		assertThat(analyticsMetadataColumnType).isEqualTo("jsonb");
 		assertThat(orderMetadataColumnType).isEqualTo("jsonb");
@@ -267,6 +277,7 @@ class PostgresIntegrationTest extends AbstractContainerIntegrationTest {
 		assertThat(productAnalyticsEventIndexes).isEqualTo(1);
 		assertThat(orderIdempotencyIndexes).isEqualTo(1);
 		assertThat(cashLedgerIndexes).isEqualTo(1);
+		assertThat(cashFlowLedgerDateIndexes).isEqualTo(1);
 		assertThat(positionLedgerIndexes).isEqualTo(1);
 		assertThat(orderExecutionRequestTables).isEqualTo(1);
 		assertThat(orderExecutionRequestUniqueOrderIndexes).isEqualTo(1);
