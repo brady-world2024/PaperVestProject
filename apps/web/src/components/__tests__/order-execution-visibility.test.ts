@@ -2,6 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import type { Order } from '@papervest/shared-types';
+import {
+  orderExecutionDetail as sharedOrderExecutionDetail,
+  orderExecutionLabel as sharedOrderExecutionLabel,
+  orderExecutionTone as sharedOrderExecutionTone,
+} from '@papervest/shared-types';
 
 import {
   orderExecutionDetail,
@@ -37,6 +42,12 @@ const baseOrder: Order = {
   updatedAt: '2026-07-03T15:00:02Z',
   execution: null,
 };
+
+test('order execution presentation re-exports the shared OMS helpers', () => {
+  assert.equal(orderExecutionLabel, sharedOrderExecutionLabel);
+  assert.equal(orderExecutionDetail, sharedOrderExecutionDetail);
+  assert.equal(orderExecutionTone, sharedOrderExecutionTone);
+});
 
 test('order execution presentation describes pending orders without a trigger request', () => {
   assert.equal(orderExecutionLabel(baseOrder), 'Not triggered yet');
