@@ -1,3 +1,7 @@
+// Node executes this source package directly in tests, so the ESM specifier needs the .ts extension.
+// @ts-expect-error TS5097: this package intentionally publishes source TypeScript for local workspaces.
+export * from './order-lifecycle.ts';
+
 export type MarketSessionState = 'OPEN' | 'CLOSED' | 'PRE_MARKET' | 'AFTER_HOURS';
 
 export type MarketSessionPresentation = {
