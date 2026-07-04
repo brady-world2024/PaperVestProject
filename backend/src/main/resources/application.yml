@@ -54,7 +54,7 @@ management:
         liveness:
           include: livenessState,ping
         readiness:
-          include: readinessState,db,diskSpace,ping,marketDataConfiguration,conditionalOrdersRuntime
+          include: readinessState,db,diskSpace,ping,marketDataConfiguration,conditionalOrdersRuntime,ledgerReconciliation
 
 logging:
   level:

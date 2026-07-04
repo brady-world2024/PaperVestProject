@@ -70,7 +70,9 @@ class OperationsObservabilityIntegrationTest {
 				.andExpect(jsonPath("$.components.marketDataConfiguration.details.provider").value("FINNHUB"))
 				.andExpect(jsonPath("$.components.conditionalOrdersRuntime.status").value("UP"))
 				.andExpect(jsonPath("$.components.conditionalOrdersRuntime.details.listenerEnabled").value(false))
-				.andExpect(jsonPath("$.components.conditionalOrdersRuntime.details.schedulerEnabled").value(false));
+				.andExpect(jsonPath("$.components.conditionalOrdersRuntime.details.schedulerEnabled").value(false))
+				.andExpect(jsonPath("$.components.ledgerReconciliation.status").value("UP"))
+				.andExpect(jsonPath("$.components.ledgerReconciliation.details.issueCount").value(0));
 
 		mockMvc.perform(get("/livez"))
 				.andExpect(status().isOk())
