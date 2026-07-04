@@ -3,10 +3,12 @@ package com.papervest.portfolio.service;
 import com.papervest.portfolio.dto.HoldingResponse;
 import com.papervest.portfolio.dto.PortfolioResponse;
 import com.papervest.portfolio.dto.PortfolioSummaryResponse;
+import com.papervest.portfolio.model.DailyPerformanceSnapshot;
 import com.papervest.portfolio.model.PortfolioPerformanceRange;
 import com.papervest.portfolio.model.PortfolioPerformanceStatus;
 import com.papervest.portfolio.model.PortfolioSnapshot;
 import com.papervest.portfolio.model.PortfolioSnapshotSource;
+import com.papervest.portfolio.repository.DailyPerformanceSnapshotRepository;
 import com.papervest.portfolio.repository.PortfolioSnapshotRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
@@ -34,6 +37,9 @@ class PortfolioPerformanceServiceTest {
 	private PortfolioSnapshotRepository portfolioSnapshotRepository;
 
 	@Mock
+	private DailyPerformanceSnapshotRepository dailyPerformanceSnapshotRepository;
+
+	@Mock
 	private PortfolioValuationService portfolioValuationService;
 
 	private PortfolioPerformanceService portfolioPerformanceService;
@@ -42,9 +48,51 @@ class PortfolioPerformanceServiceTest {
 	void setUp() {
 		portfolioPerformanceService = new PortfolioPerformanceService(
 				portfolioSnapshotRepository,
+				dailyPerformanceSnapshotRepository,
 				portfolioValuationService,
+				new PerformanceReturnCalculator(),
 				Clock.fixed(NOW, ZoneOffset.UTC)
 		);
+	}
+
+	@Test
+	void usesDailySnapshotsForProfessionalReturnMetrics() {
+		UUID userId = UUID.randomUUID();
+		LocalDate today = LocalDate.parse("2026-07-05");
+		when(dailyPerformanceSnapshotRepository.findByUserIdAndPerformanceDateLessThanEqualOrderByPerformanceDateAsc(
+				userId,
+				today
+		)).thenReturn(List.of(
+				dailySnapshot(userId, "2026-06-05", "100000.00", "20000.00", "80000.00", "1000.00", "2000.00", "0.00", "0.00", "0.00", null),
+				dailySnapshot(userId, "2026-06-06", "110000.00", "22000.00", "88000.00", "1200.00", "8800.00", "0.00", "10.00", "10.00", "10.00"),
+				dailySnapshot(userId, "2026-06-07", "104500.00", "20900.00", "83600.00", "1500.00", "3000.00", "0.00", "-5.00", "4.50", "4.50")
+		));
+		when(portfolioValuationService.getPortfolio(userId)).thenReturn(portfolio(
+				"106000.00",
+				"21200.00",
+				"84800.00",
+				"2500.00",
+				"3500.00",
+				List.of(holding("AAPL", "Apple Inc.", "33920.00", "3500.00", "11.55"))
+		));
+
+		var response = portfolioPerformanceService.getPerformance(userId, PortfolioPerformanceRange.ONE_MONTH);
+
+		assertThat(response.status()).isEqualTo(PortfolioPerformanceStatus.READY);
+		assertThat(response.from()).isEqualTo(Instant.parse("2026-06-05T00:00:00Z"));
+		assertThat(response.summary().currentValue()).isEqualByComparingTo("106000.00");
+		assertThat(response.summary().startValue()).isEqualByComparingTo("100000.00");
+		assertThat(response.summary().endValue()).isEqualByComparingTo("104500.00");
+		assertThat(response.summary().absoluteReturn()).isEqualByComparingTo("4500.00");
+		assertThat(response.summary().returnPercent()).isEqualByComparingTo("4.50");
+		assertThat(response.summary().periodReturnPercent()).isEqualByComparingTo("-5.00");
+		assertThat(response.summary().timeWeightedReturnPercent()).isEqualByComparingTo("4.50");
+		assertThat(response.summary().moneyWeightedReturnPercent()).isEqualByComparingTo("4.50");
+		assertThat(response.summary().netCashFlow()).isEqualByComparingTo("0.00");
+		assertThat(response.points()).hasSize(3);
+		assertThat(response.points().getLast().date()).isEqualTo(LocalDate.parse("2026-06-07"));
+		assertThat(response.points().getLast().timeWeightedReturnPercent()).isEqualByComparingTo("4.50");
+		assertThat(response.points().getLast().moneyWeightedReturnPercent()).isEqualByComparingTo("4.50");
 	}
 
 	@Test
@@ -231,6 +279,34 @@ class PortfolioPerformanceServiceTest {
 				bd(unrealizedPnl),
 				PortfolioSnapshotSource.TRADE_EXECUTION,
 				capturedAt
+		);
+	}
+
+	private DailyPerformanceSnapshot dailySnapshot(
+			UUID userId,
+			String performanceDate,
+			String totalPortfolioValue,
+			String cashBalance,
+			String holdingsMarketValue,
+			String realizedPnl,
+			String unrealizedPnl,
+			String netCashFlow,
+			String periodReturnPercent,
+			String cumulativeTwrPercent,
+			String cumulativeMwrPercent
+	) {
+		return new DailyPerformanceSnapshot(
+				userId,
+				LocalDate.parse(performanceDate),
+				bd(totalPortfolioValue),
+				bd(cashBalance),
+				bd(holdingsMarketValue),
+				bd(realizedPnl),
+				bd(unrealizedPnl),
+				bd(netCashFlow),
+				bd(periodReturnPercent),
+				bd(cumulativeTwrPercent),
+				cumulativeMwrPercent == null ? null : bd(cumulativeMwrPercent)
 		);
 	}
 

@@ -2,6 +2,7 @@ package com.papervest.user.repository;
 
 import com.papervest.user.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 
 import java.util.Collection;
 import java.util.List;
@@ -19,4 +20,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 	List<User> findTop25ByEmailContainingIgnoreCaseOrderByCreatedAtDesc(String email);
 
 	List<User> findAllByEmailIn(Collection<String> emails);
+
+	@Query("select user.id from User user")
+	List<UUID> findAllIds();
 }

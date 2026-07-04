@@ -17,6 +17,10 @@ const samplePerformance: PortfolioPerformanceResponse = {
     endValue: 106000,
     absoluteReturn: 6000,
     returnPercent: 6,
+    periodReturnPercent: -1.25,
+    timeWeightedReturnPercent: 4.5,
+    moneyWeightedReturnPercent: 4.25,
+    netCashFlow: 0,
     maxDrawdownPercent: 4,
     realizedPnl: 2500,
     unrealizedPnl: 3500,
@@ -47,9 +51,14 @@ const samplePerformance: PortfolioPerformanceResponse = {
   points: [
     {
       timestamp: '2026-06-05T00:00:00Z',
+      date: '2026-06-05',
       totalPortfolioValue: 100000,
       cashBalance: 20000,
       holdingsMarketValue: 80000,
+      periodReturnPercent: 0,
+      timeWeightedReturnPercent: 0,
+      moneyWeightedReturnPercent: null,
+      netCashFlow: 0,
       drawdownPercent: 0,
     },
   ],
@@ -67,6 +76,8 @@ test('portfolio performance center renders backend-derived performance sections'
 
   assert.match(html, /Performance center/);
   assert.match(html, /Range return/);
+  assert.match(html, /Time-weighted return/);
+  assert.match(html, /Money-weighted return/);
   assert.match(html, /Max drawdown/);
   assert.match(html, /Allocation/);
   assert.match(html, /P&amp;L contribution/);

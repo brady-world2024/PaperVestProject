@@ -223,8 +223,37 @@ class PostgresIntegrationTest extends AbstractContainerIntegrationTest {
 					""",
 				Integer.class
 		);
+		Integer dailyPerformanceSnapshotTables = jdbcTemplate.queryForObject(
+				"""
+					select count(*)
+					from information_schema.tables
+					where table_schema = 'public'
+					  and table_name = 'daily_performance_snapshots'
+					""",
+				Integer.class
+		);
+		Integer dailyPerformanceSnapshotIndexes = jdbcTemplate.queryForObject(
+				"""
+					select count(*)
+					from pg_indexes
+					where schemaname = 'public'
+					  and tablename = 'daily_performance_snapshots'
+					  and indexname = 'ix_daily_performance_snapshots_user_date'
+					""",
+				Integer.class
+		);
+		Integer dailyPerformanceSnapshotUniqueIndexes = jdbcTemplate.queryForObject(
+				"""
+					select count(*)
+					from pg_indexes
+					where schemaname = 'public'
+					  and tablename = 'daily_performance_snapshots'
+					  and indexname = 'ux_daily_performance_snapshots_user_date'
+					""",
+				Integer.class
+		);
 
-		assertThat(appliedMigrations).isEqualTo(9);
+		assertThat(appliedMigrations).isEqualTo(10);
 		assertThat(metadataColumnType).isEqualTo("jsonb");
 		assertThat(analyticsMetadataColumnType).isEqualTo("jsonb");
 		assertThat(orderMetadataColumnType).isEqualTo("jsonb");
@@ -243,6 +272,9 @@ class PostgresIntegrationTest extends AbstractContainerIntegrationTest {
 		assertThat(orderExecutionRequestUniqueOrderIndexes).isEqualTo(1);
 		assertThat(orderExecutionRequestPendingDispatchIndexes).isEqualTo(1);
 		assertThat(orderExecutionRequestOrderStatusIndexes).isEqualTo(1);
+		assertThat(dailyPerformanceSnapshotTables).isEqualTo(1);
+		assertThat(dailyPerformanceSnapshotIndexes).isEqualTo(1);
+		assertThat(dailyPerformanceSnapshotUniqueIndexes).isEqualTo(1);
 	}
 
 	@Test

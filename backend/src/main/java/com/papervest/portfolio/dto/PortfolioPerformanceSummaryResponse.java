@@ -8,6 +8,10 @@ public record PortfolioPerformanceSummaryResponse(
 		BigDecimal endValue,
 		BigDecimal absoluteReturn,
 		BigDecimal returnPercent,
+		BigDecimal periodReturnPercent,
+		BigDecimal timeWeightedReturnPercent,
+		BigDecimal moneyWeightedReturnPercent,
+		BigDecimal netCashFlow,
 		BigDecimal maxDrawdownPercent,
 		BigDecimal realizedPnl,
 		BigDecimal unrealizedPnl
