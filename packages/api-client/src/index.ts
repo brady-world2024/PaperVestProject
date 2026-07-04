@@ -26,6 +26,8 @@ import type {
   OrderListResponse,
   PortfolioHistoryRange,
   PortfolioHistoryResponse,
+  PortfolioPerformanceRange,
+  PortfolioPerformanceResponse,
   PortfolioResponse,
   Quote,
   RefreshTokenPayload,
@@ -259,6 +261,12 @@ export function createPapervestApiClient({
     },
     async getPortfolioHistory(range: PortfolioHistoryRange) {
       const { data } = await apiClient.get<PortfolioHistoryResponse>('/portfolio/history', {
+        params: { range },
+      });
+      return data;
+    },
+    async getPortfolioPerformance(range: PortfolioPerformanceRange) {
+      const { data } = await apiClient.get<PortfolioPerformanceResponse>('/portfolio/performance', {
         params: { range },
       });
       return data;

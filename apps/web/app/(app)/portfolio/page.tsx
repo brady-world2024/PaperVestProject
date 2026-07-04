@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getMarketSessionPresentation, type PortfolioHistoryRange } from '@papervest/shared-types';
+import { getMarketSessionPresentation, type PortfolioPerformanceRange } from '@papervest/shared-types';
 
 import { AppButton } from '@/components/app-button';
 import { AppButtonLink } from '@/components/app-button';
@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/empty-state';
 import { InlineNotice } from '@/components/inline-notice';
 import { MetricCard } from '@/components/metric-card';
 import { PortfolioHistoryChart } from '@/components/portfolio-history-chart';
+import { PortfolioPerformanceCenter } from '@/components/portfolio-performance-center';
 import { SectionHeader } from '@/components/section-header';
 import { getStaleQuoteBadge, getStaleQuoteMessage } from '@/lib/market-data-freshness';
 import { liveQuoteRefreshOptions } from '@/lib/market-data-refresh';
@@ -34,7 +35,7 @@ import { useWorkspaceDensity } from '@/lib/use-workspace-density';
 import { sortHoldings, sortTrades, type HoldingSort, type TradeSort } from '@/lib/workspace-grids';
 
 export default function PortfolioPage() {
-  const [historyRange, setHistoryRange] = useState<PortfolioHistoryRange>('1M');
+  const [performanceRange, setPerformanceRange] = useState<PortfolioPerformanceRange>('1M');
   const [holdingSort, setHoldingSort] = useState<HoldingSort>('marketValue');
   const [tradeSort, setTradeSort] = useState<TradeSort>('latest');
   const { density, setDensity } = useWorkspaceDensity('pv-portfolio-density');
@@ -50,8 +51,15 @@ export default function PortfolioPage() {
   });
 
   const portfolioHistoryQuery = useQuery({
-    queryKey: queryKeys.portfolioHistory(historyRange),
-    queryFn: () => webApi.getPortfolioHistory(historyRange),
+    queryKey: queryKeys.portfolioHistory(performanceRange),
+    queryFn: () => webApi.getPortfolioHistory(performanceRange),
+    placeholderData: (previousData) => previousData,
+  });
+
+  const portfolioPerformanceQuery = useQuery({
+    queryKey: queryKeys.portfolioPerformance(performanceRange),
+    queryFn: () => webApi.getPortfolioPerformance(performanceRange),
+    ...liveQuoteRefreshOptions,
     placeholderData: (previousData) => previousData,
   });
 
@@ -66,6 +74,9 @@ export default function PortfolioPage() {
   });
   const portfolioHistoryErrorMessage = portfolioHistoryQuery.isError
     ? webApi.getApiErrorMessage(portfolioHistoryQuery.error, 'Unable to load portfolio history right now')
+    : null;
+  const portfolioPerformanceErrorMessage = portfolioPerformanceQuery.isError
+    ? webApi.getApiErrorMessage(portfolioPerformanceQuery.error, 'Unable to load portfolio performance right now')
     : null;
 
   return (
@@ -149,13 +160,24 @@ export default function PortfolioPage() {
       </section>
 
       <AppCard className="pv-chart-card">
+        <PortfolioPerformanceCenter
+          range={performanceRange}
+          performance={portfolioPerformanceQuery.data}
+          loading={portfolioPerformanceQuery.isLoading}
+          refreshing={portfolioPerformanceQuery.isFetching && Boolean(portfolioPerformanceQuery.data)}
+          errorMessage={portfolioPerformanceErrorMessage}
+          onSelectRange={setPerformanceRange}
+        />
+      </AppCard>
+
+      <AppCard className="pv-chart-card">
         <PortfolioHistoryChart
-          range={historyRange}
+          range={performanceRange}
           history={portfolioHistoryQuery.data}
           loading={portfolioHistoryQuery.isLoading}
           refreshing={portfolioHistoryQuery.isFetching && Boolean(portfolioHistoryQuery.data?.points.length)}
           errorMessage={portfolioHistoryErrorMessage}
-          onSelectRange={setHistoryRange}
+          onSelectRange={setPerformanceRange}
         />
       </AppCard>
 

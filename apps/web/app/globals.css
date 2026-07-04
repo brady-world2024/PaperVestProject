@@ -967,6 +967,7 @@ input {
 .pv-chart-shell {
   display: grid;
   gap: 16px;
+  position: relative;
 }
 
 .pv-chart-toolbar {
@@ -1080,6 +1081,62 @@ input {
   border-radius: 16px;
   border: 1px solid rgba(227, 220, 202, 0.9);
   background: rgba(255, 255, 255, 0.78);
+}
+
+.pv-performance-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.pv-performance-panel {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(227, 220, 202, 0.9);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(247, 243, 236, 0.78));
+}
+
+.pv-performance-row {
+  display: grid;
+  gap: 8px;
+}
+
+.pv-performance-row-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  color: var(--pv-color-text-muted);
+  font-size: 0.84rem;
+  font-weight: 720;
+}
+
+.pv-performance-row-head strong {
+  color: var(--pv-color-text);
+  text-align: right;
+}
+
+.pv-performance-meter {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(94, 109, 120, 0.12);
+}
+
+.pv-performance-meter span {
+  display: block;
+  min-width: 4px;
+  height: 100%;
+  border-radius: inherit;
+  background:
+    linear-gradient(90deg, rgba(15, 139, 141, 0.86), rgba(30, 158, 98, 0.84));
+}
+
+.pv-performance-contributors {
+  --pv-workspace-columns: minmax(220px, 2fr) repeat(3, minmax(120px, 1fr));
 }
 
 .pv-chart-canvas-wrap {
@@ -2415,6 +2472,7 @@ input {
   }
 
   .pv-decision-support-grid,
+  .pv-performance-grid,
   .pv-trust-grid {
     grid-template-columns: 1fr;
   }
@@ -2444,6 +2502,11 @@ input {
 
   .pv-chart-action-row {
     width: 100%;
+  }
+
+  .pv-performance-row-head {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .pv-shell-topbar-actions,

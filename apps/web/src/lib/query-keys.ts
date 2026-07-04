@@ -8,6 +8,7 @@ export const queryKeys = {
   portfolio: ['portfolio'] as const,
   portfolioHistoryRoot: ['portfolio-history'] as const,
   portfolioHistory: (range: string) => ['portfolio-history', range] as const,
+  portfolioPerformance: (range: string) => ['portfolio-performance', range] as const,
   stockSearch: (query: string) => ['stock-search', query] as const,
   stockDetail: (symbol: string) => ['stock-detail', symbol] as const,
   stockHistory: (symbol: string, range: string) => ['stock-history', symbol, range] as const,

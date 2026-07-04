@@ -2,9 +2,12 @@ package com.papervest.portfolio.controller;
 
 import com.papervest.common.security.AuthenticatedUser;
 import com.papervest.portfolio.dto.PortfolioHistoryResponse;
+import com.papervest.portfolio.dto.PortfolioPerformanceResponse;
 import com.papervest.portfolio.dto.PortfolioResponse;
 import com.papervest.portfolio.model.PortfolioHistoryRange;
+import com.papervest.portfolio.model.PortfolioPerformanceRange;
 import com.papervest.portfolio.service.PortfolioHistoryService;
+import com.papervest.portfolio.service.PortfolioPerformanceService;
 import com.papervest.portfolio.service.PortfolioQueryService;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,13 +21,16 @@ public class PortfolioController {
 
 	private final PortfolioQueryService portfolioQueryService;
 	private final PortfolioHistoryService portfolioHistoryService;
+	private final PortfolioPerformanceService portfolioPerformanceService;
 
 	public PortfolioController(
 			PortfolioQueryService portfolioQueryService,
-			PortfolioHistoryService portfolioHistoryService
+			PortfolioHistoryService portfolioHistoryService,
+			PortfolioPerformanceService portfolioPerformanceService
 	) {
 		this.portfolioQueryService = portfolioQueryService;
 		this.portfolioHistoryService = portfolioHistoryService;
+		this.portfolioPerformanceService = portfolioPerformanceService;
 	}
 
 	@GetMapping
@@ -38,5 +44,16 @@ public class PortfolioController {
 			@RequestParam(defaultValue = "1M") String range
 	) {
 		return portfolioHistoryService.getHistory(currentUser.userId(), PortfolioHistoryRange.fromValue(range));
+	}
+
+	@GetMapping("/performance")
+	public PortfolioPerformanceResponse getPortfolioPerformance(
+			@AuthenticationPrincipal AuthenticatedUser currentUser,
+			@RequestParam(defaultValue = "1M") String range
+	) {
+		return portfolioPerformanceService.getPerformance(
+				currentUser.userId(),
+				PortfolioPerformanceRange.fromValue(range)
+		);
 	}
 }

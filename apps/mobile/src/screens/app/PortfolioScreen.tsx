@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
 import { RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import type { PortfolioPerformanceRange } from '@papervest/shared-types';
 
 import { AppCard } from '../../components/common/AppCard';
 import { EmptyState } from '../../components/feedback/EmptyState';
@@ -11,8 +13,9 @@ import { ScreenContainer } from '../../components/layout/ScreenContainer';
 import { SectionHeader } from '../../components/layout/SectionHeader';
 import { MarketSessionBadge } from '../../components/market/MarketSessionBadge';
 import { MetricCard } from '../../components/portfolio/MetricCard';
+import { PortfolioPerformanceSummary } from '../../components/portfolio/PortfolioPerformanceSummary';
 import { AppStackParamList } from '../../navigation/RootNavigator';
-import { getPortfolio } from '../../services/api/papervestApi';
+import { getPortfolio, getPortfolioPerformance } from '../../services/api/papervestApi';
 import { liveQuoteRefreshOptions } from '../../services/api/market-data-refresh';
 import { queryKeys } from '../../services/api/queryKeys';
 import { appTheme } from '../../theme';
@@ -27,11 +30,19 @@ import { describeMarketSession } from '../../utils/marketSession';
 
 export function PortfolioScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
+  const [performanceRange, setPerformanceRange] = useState<PortfolioPerformanceRange>('1M');
 
   const portfolioQuery = useQuery({
     queryKey: queryKeys.portfolio,
     queryFn: getPortfolio,
     ...liveQuoteRefreshOptions,
+  });
+
+  const portfolioPerformanceQuery = useQuery({
+    queryKey: queryKeys.portfolioPerformance(performanceRange),
+    queryFn: () => getPortfolioPerformance(performanceRange),
+    ...liveQuoteRefreshOptions,
+    placeholderData: (previousData) => previousData,
   });
 
   const summary = portfolioQuery.data?.summary;
@@ -43,6 +54,7 @@ export function PortfolioScreen() {
           refreshing={portfolioQuery.isRefetching}
           onRefresh={() => {
             void portfolioQuery.refetch();
+            void portfolioPerformanceQuery.refetch();
           }}
         />
       }
@@ -93,6 +105,14 @@ export function PortfolioScreen() {
           </>
         )}
       </View>
+
+      <PortfolioPerformanceSummary
+        range={performanceRange}
+        performance={portfolioPerformanceQuery.data}
+        loading={portfolioPerformanceQuery.isLoading}
+        errorMessage={portfolioPerformanceQuery.isError ? 'Unable to load performance right now.' : null}
+        onSelectRange={setPerformanceRange}
+      />
 
       <View style={styles.section}>
         <SectionHeader

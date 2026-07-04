@@ -264,6 +264,65 @@ export type PortfolioHistoryResponse = {
   points: PortfolioHistoryPoint[];
 };
 
+export type PortfolioPerformanceRange = '1W' | '1M' | '3M' | 'ALL';
+
+export type PortfolioPerformanceStatus = 'READY' | 'INSUFFICIENT_HISTORY';
+
+export type PortfolioPerformanceSummary = {
+  currentValue: number;
+  startValue: number;
+  endValue: number;
+  absoluteReturn: number;
+  returnPercent: number;
+  maxDrawdownPercent: number;
+  realizedPnl: number;
+  unrealizedPnl: number;
+};
+
+export type PortfolioAllocation = {
+  cashValue: number;
+  cashPercent: number;
+  holdingsValue: number;
+  holdingsPercent: number;
+};
+
+export type PortfolioPnlContribution = {
+  realizedValue: number;
+  realizedPercent: number;
+  unrealizedValue: number;
+  unrealizedPercent: number;
+};
+
+export type PortfolioHoldingContribution = {
+  rank: number;
+  symbol: string;
+  companyName: string;
+  marketValue: number;
+  portfolioWeightPercent: number;
+  unrealizedPnl: number;
+  unrealizedPnlPercent: number;
+};
+
+export type PortfolioPerformancePoint = {
+  timestamp: string;
+  totalPortfolioValue: number;
+  cashBalance: number;
+  holdingsMarketValue: number;
+  drawdownPercent: number;
+};
+
+export type PortfolioPerformanceResponse = {
+  range: PortfolioPerformanceRange;
+  from: string | null;
+  to: string;
+  status: PortfolioPerformanceStatus;
+  summary: PortfolioPerformanceSummary;
+  allocation: PortfolioAllocation;
+  pnlContribution: PortfolioPnlContribution;
+  topHoldings: PortfolioHoldingContribution[];
+  points: PortfolioPerformancePoint[];
+};
+
 export type NotificationType =
   | 'CONDITIONAL_ORDER_CREATED'
   | 'CONDITIONAL_ORDER_TRIGGERED'
