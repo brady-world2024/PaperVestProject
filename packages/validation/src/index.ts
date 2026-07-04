@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+const CASH_FLOW_AMOUNT_PATTERN = /^\d+(\.\d{1,2})?$/;
+const CASH_FLOW_MAX_AMOUNT = 999_999_999_999.99;
+
 export const emailSchema = z.string().email('Enter a valid email address');
 
 export const passwordSchema = z
@@ -54,6 +57,29 @@ export const deleteAccountFormSchema = z.object({
   currentPassword: z.string().min(1, 'Enter your current password'),
 });
 
+export const cashFlowFormSchema = z.object({
+  amount: z
+    .string()
+    .trim()
+    .min(1, 'Enter an amount')
+    .refine((value) => !Number.isNaN(Number(value)), 'Enter a valid amount')
+    .refine((value) => Number(value) > 0, 'Amount must be greater than zero')
+    .refine(
+      (value) => CASH_FLOW_AMOUNT_PATTERN.test(value),
+      'Use dollars and cents with no more than two decimal places'
+    )
+    .refine(
+      (value) => Number(value) <= CASH_FLOW_MAX_AMOUNT,
+      'Amount must be 999,999,999,999.99 or less'
+    ),
+  memo: z
+    .string()
+    .trim()
+    .max(120, 'Memo must be 120 characters or fewer')
+    .optional()
+    .default(''),
+});
+
 export const tradeFormSchema = z.object({
   quantity: z
     .string()
@@ -93,6 +119,7 @@ export type ForgotPasswordFormValues = z.infer<typeof forgotPasswordFormSchema>;
 export type ResetPasswordFormValues = z.infer<typeof resetPasswordFormSchema>;
 export type ChangePasswordFormValues = z.infer<typeof changePasswordFormSchema>;
 export type DeleteAccountFormValues = z.infer<typeof deleteAccountFormSchema>;
+export type CashFlowFormValues = z.infer<typeof cashFlowFormSchema>;
 export type TradeFormValues = z.infer<typeof tradeFormSchema>;
 export type ConditionalOrderFormValues = z.infer<typeof conditionalOrderFormSchema>;
 
@@ -102,4 +129,8 @@ export function normalizeTradeQuantity(quantity: string) {
 
 export function normalizeConditionalOrderNumber(value: string) {
   return Number(value);
+}
+
+export function normalizeCashFlowAmount(amount: string) {
+  return Number(amount);
 }

@@ -194,7 +194,27 @@ public class LedgerService {
 		);
 	}
 
-	private void recordCashEntry(
+	public CashLedgerEntry recordExternalCashFlow(
+			UUID userId,
+			CashLedgerEntryType entryType,
+			BigDecimal amount,
+			UserAccount account,
+			String idempotencyKey,
+			String memo
+	) {
+		return recordCashEntry(
+				userId,
+				null,
+				null,
+				entryType,
+				amount,
+				account,
+				idempotencyKey,
+				memo
+		);
+	}
+
+	private CashLedgerEntry recordCashEntry(
 			UUID userId,
 			UUID orderId,
 			UUID tradeId,
@@ -204,7 +224,7 @@ public class LedgerService {
 			String idempotencyKey,
 			String memo
 	) {
-		cashLedgerEntryRepository.findByIdempotencyKey(idempotencyKey)
+		return cashLedgerEntryRepository.findByIdempotencyKey(idempotencyKey)
 				.orElseGet(() -> cashLedgerEntryRepository.save(new CashLedgerEntry(
 						userId,
 						orderId,

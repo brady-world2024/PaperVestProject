@@ -358,6 +358,28 @@ export type NotificationListResponse = {
   notifications: UserNotification[];
 };
 
+export type CashFlowEntryType = 'DEPOSIT' | 'WITHDRAWAL';
+
+export type CashFlow = {
+  id: string;
+  type: CashFlowEntryType;
+  amount: number;
+  cashBalanceAfter: number;
+  reservedCashAfter: number;
+  memo: string | null;
+  createdAt: string;
+  idempotentReplay: boolean;
+};
+
+export type CashFlowListResponse = {
+  cashFlows: CashFlow[];
+};
+
+export type CashFlowPayload = {
+  amount: number;
+  memo?: string | null;
+};
+
 export type AccountProfile = {
   userId: string;
   email: string;
