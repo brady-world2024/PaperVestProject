@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface PortfolioSnapshotRepository extends JpaRepository<PortfolioSnapshot, UUID> {
@@ -12,4 +13,6 @@ public interface PortfolioSnapshotRepository extends JpaRepository<PortfolioSnap
 	List<PortfolioSnapshot> findByUserIdOrderByCreatedAtAsc(UUID userId);
 
 	List<PortfolioSnapshot> findByUserIdAndCreatedAtGreaterThanEqualOrderByCreatedAtAsc(UUID userId, Instant createdAt);
+
+	Optional<PortfolioSnapshot> findFirstByUserIdAndCreatedAtLessThanEqualOrderByCreatedAtDesc(UUID userId, Instant createdAt);
 }

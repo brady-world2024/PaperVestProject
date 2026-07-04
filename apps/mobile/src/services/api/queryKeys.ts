@@ -5,6 +5,7 @@ export const queryKeys = {
   stockSearch: (query: string) => ['stock-search', query] as const,
   watchlist: ['watchlist'] as const,
   portfolio: ['portfolio'] as const,
+  portfolioPerformance: (range: string) => ['portfolio-performance', range] as const,
   tradeHistory: ['trade-history'] as const,
   orders: ['orders'] as const,
   order: (orderId: string) => ['order', orderId] as const,

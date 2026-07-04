@@ -5,6 +5,7 @@ import type {
   CreateOrderPayload,
   DeleteAccountPayload,
   LoginPayload,
+  PortfolioPerformanceRange,
   RequestPasswordResetPayload,
   RegisterPayload,
   ResetPasswordPayload,
@@ -63,6 +64,10 @@ export function removeWatchlistItem(symbol: string) {
 
 export function getPortfolio() {
   return papervestApiClient.getPortfolio();
+}
+
+export function getPortfolioPerformance(range: PortfolioPerformanceRange) {
+  return papervestApiClient.getPortfolioPerformance(range);
 }
 
 export function getAccountProfile() {
