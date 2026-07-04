@@ -32,6 +32,9 @@ app:
     messaging:
       listener-enabled: false
   orders:
+    expiration:
+      scheduler:
+        enabled: false
     execution:
       scheduler:
         enabled: false

@@ -39,6 +39,19 @@ describe('order execution presentation', () => {
     expect(orderExecutionDetail(baseOrder)).toBe('Waiting for market conditions');
   });
 
+  it('describes an expired order that did not execute asynchronously', () => {
+    const expiredOrder: Order = {
+      ...baseOrder,
+      status: 'EXPIRED',
+      reservedCashAmount: 0,
+      completedAt: '2026-07-03T20:00:00Z',
+      expiresAt: '2026-07-03T20:00:00Z',
+    };
+
+    expect(orderExecutionLabel(expiredOrder)).toBe('Expired');
+    expect(orderExecutionDetail(expiredOrder)).toBe('Reservation released');
+  });
+
   it('describes a worker-consumed execution request', () => {
     const consumedOrder: Order = {
       ...baseOrder,

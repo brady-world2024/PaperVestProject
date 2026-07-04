@@ -60,6 +60,7 @@ public class OrderService {
 	private final HoldingRepository holdingRepository;
 	private final TradeRepository tradeRepository;
 	private final OrderExecutionRequestRepository orderExecutionRequestRepository;
+	private final OrderExpirationPolicy orderExpirationPolicy;
 	private final MarketDataService marketDataService;
 	private final LedgerService ledgerService;
 	private final PortfolioHistoryService portfolioHistoryService;
@@ -73,6 +74,7 @@ public class OrderService {
 			HoldingRepository holdingRepository,
 			TradeRepository tradeRepository,
 			OrderExecutionRequestRepository orderExecutionRequestRepository,
+			OrderExpirationPolicy orderExpirationPolicy,
 			MarketDataService marketDataService,
 			LedgerService ledgerService,
 			PortfolioHistoryService portfolioHistoryService,
@@ -85,6 +87,7 @@ public class OrderService {
 		this.holdingRepository = holdingRepository;
 		this.tradeRepository = tradeRepository;
 		this.orderExecutionRequestRepository = orderExecutionRequestRepository;
+		this.orderExpirationPolicy = orderExpirationPolicy;
 		this.marketDataService = marketDataService;
 		this.ledgerService = ledgerService;
 		this.portfolioHistoryService = portfolioHistoryService;
@@ -474,6 +477,7 @@ public class OrderService {
 				normalizedStopPrice,
 				normalizedIdempotencyKey
 		));
+		order.assignExpiration(orderExpirationPolicy.expiresAtFor(request.timeInForce(), Instant.now()));
 		appendEvent(order.getId(), null, OrderStatus.CREATED, "ORDER_CREATED", "Order accepted for validation");
 
 		BigDecimal estimatedGrossAmount = estimatePendingGrossAmount(
