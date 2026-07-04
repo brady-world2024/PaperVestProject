@@ -14,6 +14,10 @@ const samplePerformance: PortfolioPerformanceResponse = {
     endValue: 106000,
     absoluteReturn: 6000,
     returnPercent: 6,
+    periodReturnPercent: -1.25,
+    timeWeightedReturnPercent: 4.5,
+    moneyWeightedReturnPercent: 4.25,
+    netCashFlow: 0,
     maxDrawdownPercent: 4,
     realizedPnl: 2500,
     unrealizedPnl: 3500,
@@ -57,6 +61,8 @@ describe('PortfolioPerformanceSummary', () => {
 
     expect(screen.getByText('Performance')).toBeTruthy();
     expect(screen.getByText('Range return')).toBeTruthy();
+    expect(screen.getByText('Time-weighted return')).toBeTruthy();
+    expect(screen.getByText('Money-weighted return')).toBeTruthy();
     expect(screen.getByText('Max drawdown')).toBeTruthy();
     expect(screen.getByText('Allocation')).toBeTruthy();
     expect(screen.getByText('AAPL')).toBeTruthy();

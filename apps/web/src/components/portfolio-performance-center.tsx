@@ -52,6 +52,13 @@ export function PortfolioPerformanceCenter({
   }
 
   const positiveReturn = performance.summary.absoluteReturn >= 0;
+  const positiveTwr = performance.summary.timeWeightedReturnPercent >= 0;
+  const moneyWeightedReturnTone =
+    performance.summary.moneyWeightedReturnPercent === null
+      ? undefined
+      : performance.summary.moneyWeightedReturnPercent >= 0
+        ? 'pv-positive'
+        : 'pv-negative';
   const hasContributors = performance.topHoldings.length > 0;
 
   return (
@@ -72,6 +79,18 @@ export function PortfolioPerformanceCenter({
           <span className="pv-kicker">Range return</span>
           <strong className={positiveReturn ? 'pv-positive' : 'pv-negative'}>
             {formatSignedCurrency(performance.summary.absoluteReturn)} · {formatPercent(performance.summary.returnPercent)}
+          </strong>
+        </div>
+        <div className="pv-chart-summary-card">
+          <span className="pv-kicker">Time-weighted return</span>
+          <strong className={positiveTwr ? 'pv-positive' : 'pv-negative'}>
+            {formatPercent(performance.summary.timeWeightedReturnPercent)}
+          </strong>
+        </div>
+        <div className="pv-chart-summary-card">
+          <span className="pv-kicker">Money-weighted return</span>
+          <strong className={moneyWeightedReturnTone}>
+            {formatNullablePercent(performance.summary.moneyWeightedReturnPercent)}
           </strong>
         </div>
         <div className="pv-chart-summary-card">
@@ -174,6 +193,10 @@ export function PortfolioPerformanceCenter({
       </div>
     </section>
   );
+}
+
+function formatNullablePercent(value: number | null) {
+  return value === null ? 'Pending' : formatPercent(value);
 }
 
 function PerformanceToolbar({

@@ -274,6 +274,10 @@ export type PortfolioPerformanceSummary = {
   endValue: number;
   absoluteReturn: number;
   returnPercent: number;
+  periodReturnPercent: number;
+  timeWeightedReturnPercent: number;
+  moneyWeightedReturnPercent: number | null;
+  netCashFlow: number;
   maxDrawdownPercent: number;
   realizedPnl: number;
   unrealizedPnl: number;
@@ -305,9 +309,14 @@ export type PortfolioHoldingContribution = {
 
 export type PortfolioPerformancePoint = {
   timestamp: string;
+  date: string | null;
   totalPortfolioValue: number;
   cashBalance: number;
   holdingsMarketValue: number;
+  periodReturnPercent: number;
+  timeWeightedReturnPercent: number;
+  moneyWeightedReturnPercent: number | null;
+  netCashFlow: number;
   drawdownPercent: number;
 };
 

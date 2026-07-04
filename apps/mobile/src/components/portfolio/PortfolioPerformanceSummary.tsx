@@ -71,6 +71,24 @@ export function PortfolioPerformanceSummary({
               valueNumberOfLines={1}
             />
             <MetricCard
+              label="Time-weighted return"
+              value={formatPercent(performance.summary.timeWeightedReturnPercent)}
+              tone={performance.summary.timeWeightedReturnPercent >= 0 ? 'positive' : 'negative'}
+              valueNumberOfLines={1}
+            />
+            <MetricCard
+              label="Money-weighted return"
+              value={formatNullablePercent(performance.summary.moneyWeightedReturnPercent)}
+              tone={
+                performance.summary.moneyWeightedReturnPercent === null
+                  ? 'default'
+                  : performance.summary.moneyWeightedReturnPercent >= 0
+                  ? 'positive'
+                  : 'negative'
+              }
+              valueNumberOfLines={1}
+            />
+            <MetricCard
               label="Max drawdown"
               value={formatPercent(performance.summary.maxDrawdownPercent)}
               valueNumberOfLines={1}
@@ -140,6 +158,10 @@ function PerformanceRow({
   );
 }
 
+function formatNullablePercent(value: number | null) {
+  return value === null ? 'Pending' : formatPercent(value);
+}
+
 const styles = StyleSheet.create({
   card: {
     gap: appTheme.spacing.md,
@@ -158,6 +180,7 @@ const styles = StyleSheet.create({
   },
   metrics: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: appTheme.spacing.sm,
   },
   panel: {
