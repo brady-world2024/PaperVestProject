@@ -177,10 +177,22 @@ export function getOmsLifecycleSummary(
 
 export function orderExecutionLabel(order: Pick<Order, 'status' | 'execution'>) {
   if (!order.execution) {
-    if (order.status === 'EXPIRED') {
-      return 'Expired';
+    switch (order.status) {
+      case 'FILLED':
+        return 'Immediate fill';
+      case 'CANCELLED':
+        return 'Cancelled before fill';
+      case 'EXPIRED':
+        return 'Expired';
+      case 'REJECTED':
+        return 'Order rejected';
+      case 'PARTIALLY_FILLED':
+        return 'Partially filled';
+      case 'CREATED':
+      case 'ACCEPTED':
+      case 'PENDING':
+        return 'Not triggered yet';
     }
-    return order.status === 'PENDING' ? 'Not triggered yet' : 'Immediate fill';
   }
 
   switch (order.execution.status) {
@@ -199,10 +211,21 @@ export function orderExecutionLabel(order: Pick<Order, 'status' | 'execution'>) 
 
 export function orderExecutionDetail(order: Pick<Order, 'status' | 'execution'>) {
   if (!order.execution) {
-    if (order.status === 'EXPIRED') {
-      return 'Reservation released';
+    switch (order.status) {
+      case 'FILLED':
+        return 'No async execution request';
+      case 'CANCELLED':
+      case 'EXPIRED':
+        return 'Reservation released';
+      case 'REJECTED':
+        return 'Order rejected before execution';
+      case 'PARTIALLY_FILLED':
+        return 'Waiting for remaining quantity';
+      case 'CREATED':
+      case 'ACCEPTED':
+      case 'PENDING':
+        return 'Waiting for market conditions';
     }
-    return order.status === 'PENDING' ? 'Waiting for market conditions' : 'No async execution request';
   }
 
   const execution = order.execution;
@@ -223,10 +246,19 @@ export function orderExecutionDetail(order: Pick<Order, 'status' | 'execution'>)
 
 export function orderExecutionTone(order: Pick<Order, 'status' | 'execution'>): OrderExecutionTone {
   if (!order.execution) {
-    if (order.status === 'EXPIRED') {
-      return 'neutral';
+    switch (order.status) {
+      case 'FILLED':
+        return 'positive';
+      case 'REJECTED':
+        return 'danger';
+      case 'CREATED':
+      case 'ACCEPTED':
+      case 'PENDING':
+      case 'PARTIALLY_FILLED':
+      case 'CANCELLED':
+      case 'EXPIRED':
+        return 'neutral';
     }
-    return order.status === 'PENDING' ? 'neutral' : 'positive';
   }
 
   switch (order.execution.status) {

@@ -217,6 +217,22 @@ test('execution presentation covers orders without async execution requests', ()
     ...baseOrder,
     status: 'EXPIRED',
   };
+  const cancelledOrder: Order = {
+    ...baseOrder,
+    status: 'CANCELLED',
+  };
+  const rejectedOrder: Order = {
+    ...baseOrder,
+    status: 'REJECTED',
+  };
+  const acceptedOrder: Order = {
+    ...baseOrder,
+    status: 'ACCEPTED',
+  };
+  const partiallyFilledOrder: Order = {
+    ...baseOrder,
+    status: 'PARTIALLY_FILLED',
+  };
 
   assert.equal(orderExecutionLabel(filledOrder), 'Immediate fill');
   assert.equal(orderExecutionTone(filledOrder), 'positive');
@@ -224,6 +240,18 @@ test('execution presentation covers orders without async execution requests', ()
   assert.equal(orderExecutionLabel(expiredOrder), 'Expired');
   assert.equal(orderExecutionTone(expiredOrder), 'neutral');
   assert.equal(orderExecutionDetail(expiredOrder), 'Reservation released');
+  assert.equal(orderExecutionLabel(cancelledOrder), 'Cancelled before fill');
+  assert.equal(orderExecutionTone(cancelledOrder), 'neutral');
+  assert.equal(orderExecutionDetail(cancelledOrder), 'Reservation released');
+  assert.equal(orderExecutionLabel(rejectedOrder), 'Order rejected');
+  assert.equal(orderExecutionTone(rejectedOrder), 'danger');
+  assert.equal(orderExecutionDetail(rejectedOrder), 'Order rejected before execution');
+  assert.equal(orderExecutionLabel(acceptedOrder), 'Not triggered yet');
+  assert.equal(orderExecutionTone(acceptedOrder), 'neutral');
+  assert.equal(orderExecutionDetail(acceptedOrder), 'Waiting for market conditions');
+  assert.equal(orderExecutionLabel(partiallyFilledOrder), 'Partially filled');
+  assert.equal(orderExecutionTone(partiallyFilledOrder), 'neutral');
+  assert.equal(orderExecutionDetail(partiallyFilledOrder), 'Waiting for remaining quantity');
 });
 
 test('execution presentation covers queued, published, consumed, and cancelled requests', () => {
